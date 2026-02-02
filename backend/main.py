@@ -31,8 +31,8 @@ app.add_middleware(
 )
 
 def get_llm(model_provider: str | None = None, model_name: str | None = None, **kwargs):
-    model_provider = model_provider or "deepseek"
-    model_name = model_name or "deepseek-chat"
+    model_provider = model_provider or app_config.llm.provider
+    model_name = model_name or app_config.llm.model_name
     return LLMFactory.create(model=model_name, model_provider=model_provider, **kwargs)
 
 UPLOAD_LOCATION = "/mnt/datadrive/tfwang/code/llm-mentor/data/cv/"
@@ -99,7 +99,7 @@ async def identify_skill_gap_with_info(request: SkillGapIdentificationRequest):
 
 
 @app.post("/identify-skill-gap")
-async def identify_skill_gap(goal: str = Form(...), cv: UploadFile = File(...), model_provider: str = Form("deepseek"), model_name: str = Form("deepseek-chat")):
+async def identify_skill_gap(goal: str = Form(...), cv: UploadFile = File(...), model_provider: Optional[str] = Form(None), model_name: Optional[str] = Form(None)):
     llm = get_llm(model_provider, model_name)
     mapper = SkillRequirementMapper(llm)
     skill_gap_identifier = SkillGapIdentifier(llm)

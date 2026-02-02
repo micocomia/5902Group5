@@ -102,7 +102,7 @@ def update_learner_profile_with_llm(
 if __name__ == "__main__":
     from base.llm_factory import LLMFactory
 
-    llm = LLMFactory.create(model="deepseek-chat", model_provider="deepseek")
+    llm = LLMFactory.create(model="gpt-4o", model_provider="openai")
 
     learning_goal = "Become proficient in data science."
     learner_information = "I have a background in statistics but limited programming experience."

@@ -5,8 +5,8 @@ from fastapi import File, UploadFile, Form
 
 
 class BaseRequest(BaseModel):
-    model_provider: str = "deepseek"
-    model_name: str = "deepseek-chat"
+    model_provider: Optional[str] = None
+    model_name: Optional[str] = None
     method_name: str = "genmentor"
 
 
