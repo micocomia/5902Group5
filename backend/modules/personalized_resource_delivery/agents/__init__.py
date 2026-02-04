@@ -36,6 +36,13 @@ from .search_enhanced_knowledge_drafter import (
 	draft_knowledge_point_with_llm,
 	draft_knowledge_points_with_llm,
 )
+from .learner_feedback_simulator import (
+	LearnerFeedbackSimulator,
+	LearningPathFeedbackPayload,
+	LearningContentFeedbackPayload,
+	simulate_path_feedback_with_llm,
+	simulate_content_feedback_with_llm,
+)
 
 __all__ = [
 	# Learning path
@@ -66,4 +73,10 @@ __all__ = [
 	"ContentDraftPayload",
 	"prepare_content_outline_with_llm",
 	"create_learning_content_with_llm",
+	# Feedback simulation
+	"LearnerFeedbackSimulator",
+	"LearningPathFeedbackPayload",
+	"LearningContentFeedbackPayload",
+	"simulate_path_feedback_with_llm",
+	"simulate_content_feedback_with_llm",
 ]

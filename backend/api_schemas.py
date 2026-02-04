@@ -155,3 +155,15 @@ class LearningDocumentIntegrationRequest(BaseModel):
     knowledge_points: str
     knowledge_drafts: str
     output_markdown: bool = False
+
+
+class LearningPathFeedbackRequest(BaseRequest):
+
+    learner_profile: str
+    learning_path: str
+
+
+class LearningContentFeedbackRequest(BaseRequest):
+
+    learner_profile: str
+    learning_content: str

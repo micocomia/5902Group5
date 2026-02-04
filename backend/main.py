@@ -294,7 +294,37 @@ async def tailor_knowledge_content(request: TailoredContentGenerationRequest):
         return {"tailored_content": tailored_content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+@app.post("/simulate-path-feedback")
+async def simulate_path_feedback(request: LearningPathFeedbackRequest):
+    llm = get_llm(request.model_provider, request.model_name)
+    learner_profile = request.learner_profile
+    learning_path = request.learning_path
+    try:
+        if isinstance(learner_profile, str) and learner_profile.strip():
+            learner_profile = ast.literal_eval(learner_profile)
+        if isinstance(learning_path, str) and learning_path.strip():
+            learning_path = ast.literal_eval(learning_path)
+        feedback = simulate_path_feedback_with_llm(llm, learner_profile, learning_path)
+        return {"feedback": feedback}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/simulate-content-feedback")
+async def simulate_content_feedback(request: LearningContentFeedbackRequest):
+    llm = get_llm(request.model_provider, request.model_name)
+    learner_profile = request.learner_profile
+    learning_content = request.learning_content
+    try:
+        if isinstance(learner_profile, str) and learner_profile.strip():
+            learner_profile = ast.literal_eval(learner_profile)
+        if isinstance(learning_content, str) and learning_content.strip():
+            learning_content = ast.literal_eval(learning_content)
+        feedback = simulate_content_feedback_with_llm(llm, learner_profile, learning_content)
+        return {"feedback": feedback}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     server_cfg = app_config.get("server", {})
     host = app_config.get("server", {}).get("host", "127.0.0.1")

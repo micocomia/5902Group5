@@ -57,3 +57,31 @@ class LearnerFeedbackSimulator(BaseAgent):
         raw_output = self.invoke(payload.model_dump(), task_prompt=task_prompt)
         validated_output = LearnerFeedback.model_validate(raw_output)
         return validated_output.model_dump()
+
+
+def simulate_path_feedback_with_llm(
+    llm: Any,
+    learner_profile: Mapping[str, Any],
+    learning_path: Any,
+) -> dict:
+    """Simulate learner feedback on a learning path."""
+    simulator = LearnerFeedbackSimulator(llm)
+    payload = {
+        "learner_profile": learner_profile,
+        "learning_path": learning_path,
+    }
+    return simulator.feedback_path(payload)
+
+
+def simulate_content_feedback_with_llm(
+    llm: Any,
+    learner_profile: Mapping[str, Any],
+    learning_content: Any,
+) -> dict:
+    """Simulate learner feedback on learning content."""
+    simulator = LearnerFeedbackSimulator(llm)
+    payload = {
+        "learner_profile": learner_profile,
+        "learning_content": learning_content,
+    }
+    return simulator.feedback_content(payload)
