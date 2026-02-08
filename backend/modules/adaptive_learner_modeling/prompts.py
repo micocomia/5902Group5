@@ -65,7 +65,7 @@ Chain of Thoughts for Task A
 1. Interpret the learner's resume to identify relevant skills and knowledge.
 2. Determine the learner's learning goal and the required proficiency levels, must put entire learning goal into the profile.
 3. Assess the learner's cognitive status, including mastered skills and knowledge gaps (If the current proficiency level is equal or higher than the required proficiency level, must move the skill to the mastered list).
-4. Determine the learner's FSLSM dimension values based on their background, learning style cues, and stated preferences. Set each dimension between -1 and 1.
+4. If the learner information includes initial FSLSM dimension values (from a persona selection), use those as the baseline. Only adjust values if the resume or other learner information provides strong evidence for a different learning style. Otherwise, preserve the provided values.
 5. Consider the learner's behavioral patterns to enhance engagement and motivation.
 
 Task B. Profile Update:

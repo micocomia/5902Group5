@@ -17,7 +17,7 @@ PERSIST_KEYS = [
     "learner_information",
     "learner_information_pdf",
     "learner_information_text",
-    "learner_occupation",
+    "learner_persona",
     "if_refining_learning_goal",
     "if_rescheduling_learning_path",
     "if_updating_learner_profile",
@@ -122,7 +122,7 @@ def initialize_session_state():
     if "session_learning_times" not in st.session_state:
         st.session_state["session_learning_times"] = {}
 
-    for key in ["learner_information", "learner_information_pdf", "learner_information_text", "learner_occupation"]:
+    for key in ["learner_information", "learner_information_pdf", "learner_information_text", "learner_persona"]:
         if key not in st.session_state:
             st.session_state[key] = ""
 

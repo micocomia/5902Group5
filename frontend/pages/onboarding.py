@@ -6,6 +6,7 @@ from components.goal_refinement import render_goal_refinement
 from utils.pdf import extract_text_from_pdf
 from utils.state import save_persistent_state, reset_to_add_goal
 from components.topbar import render_topbar
+from personas import PERSONAS
 
 
 def on_refine_click():
@@ -20,7 +21,7 @@ def _init_onboarding_state():
     """Ensure required session_state keys exist to avoid KeyErrors."""
     st.session_state.setdefault("onboarding_card_index", 0)  # 0: info, 1: goal
     st.session_state.setdefault("if_refining_learning_goal", False)
-    st.session_state.setdefault("learner_occupation", "")
+    st.session_state.setdefault("learner_persona", "")
     st.session_state.setdefault("learner_information_text", "")
     st.session_state.setdefault("learner_information", "")
     if "to_add_goal" not in st.session_state:
@@ -110,35 +111,26 @@ def render_information(goal):
         st.subheader("Share Your Information")
         st.info("🧠 Please provide your information (Text or PDF) to enhance personalized experience")
 
-        occupations = ["Software Engineer", "Data Scientist", "AI Researcher", "Product Manager", "UI/UX Designer", "Other"]
+        persona_names = list(PERSONAS.keys())
+        current_persona = st.session_state.get("learner_persona", "")
         try:
-            occupation_selectbox_index = occupations.index(st.session_state["learner_occupation"])
+            persona_index = persona_names.index(current_persona)
         except ValueError:
-            occupation_selectbox_index = None
-        ocp_left, ocp_right = st.columns([1, 1])
-        with ocp_left:
-            selected_occupation = st.selectbox("Select your occupation", occupations, index=occupation_selectbox_index)
-        if selected_occupation == "Other":
-            with ocp_right:
-                other_occupation = st.text_input("Please specify your occupation")
-            if other_occupation:
-                st.session_state["learner_occupation"] = other_occupation
-                try:
-                    save_persistent_state()
-                except Exception:
-                    pass
-        if selected_occupation is None:
-            st.session_state["learner_occupation"] = ""
-            try:
-                save_persistent_state()
-            except Exception:
-                pass
+            persona_index = None
+        selected_persona = st.selectbox(
+            "Select your learning persona",
+            persona_names,
+            index=persona_index,
+            format_func=lambda name: f"{name} — {PERSONAS[name]['description']}",
+        )
+        if selected_persona is not None:
+            st.session_state["learner_persona"] = selected_persona
         else:
-            st.session_state["learner_occupation"] = selected_occupation
-            try:
-                save_persistent_state()
-            except Exception:
-                pass
+            st.session_state["learner_persona"] = ""
+        try:
+            save_persistent_state()
+        except Exception:
+            pass
         upload_col, information_col = st.columns([1, 1])
         with upload_col:
             uploaded_file = st.file_uploader("[Optional] Upload a PDF with your information (e.g., resume)", type="pdf")
@@ -150,7 +142,19 @@ def render_information(goal):
                 learner_information_pdf = ""
         with information_col:
             learner_information_text = st.text_area("[Optional] Enter your learning perferences and style", value=st.session_state["learner_information_text"], label_visibility="visible", height=77)
-            st.session_state["learner_information"] = st.session_state["learner_occupation"] + learner_information_text + learner_information_pdf
+            persona_name = st.session_state.get("learner_persona", "")
+            if persona_name and persona_name in PERSONAS:
+                dims = PERSONAS[persona_name]["fslsm_dimensions"]
+                persona_prefix = (
+                    f"Learning Persona: {persona_name} "
+                    f"(initial FSLSM: processing={dims['fslsm_processing']}, "
+                    f"perception={dims['fslsm_perception']}, "
+                    f"input={dims['fslsm_input']}, "
+                    f"understanding={dims['fslsm_understanding']}). "
+                )
+            else:
+                persona_prefix = ""
+            st.session_state["learner_information"] = persona_prefix + learner_information_text + learner_information_pdf
             try:
                 save_persistent_state()
             except Exception:
@@ -169,8 +173,8 @@ def render_information(goal):
 
 def render_continue_button(goal):
     if st.button("Save & Continue", type="primary"):
-        if not goal["learning_goal"] or not st.session_state["learner_occupation"]:
-            st.warning("Please provide both a learning goal and your occupation before continuing.")
+        if not goal["learning_goal"] or not st.session_state.get("learner_persona"):
+            st.warning("Please provide both a learning goal and select a learning persona before continuing.")
         else:
             st.session_state["selected_page"] = "Skill Gap"
             try:
