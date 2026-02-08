@@ -24,6 +24,143 @@ app_config = load_config(config_name="main")
 search_rag_manager = SearchRagManager.from_config(app_config)
 
 app = FastAPI()
+from pydantic import BaseModel
+from typing import Any, Dict, List, Optional
+from datetime import datetime
+
+# MVP in-memory stores (replace with DB later)
+PROFILE_STORE: Dict[str, Dict[str, Any]] = {}
+EVENT_STORE: Dict[str, List[Dict[str, Any]]] = {}
+
+class BehaviorEvent(BaseModel):
+    user_id: str
+    event_type: str
+    payload: Dict[str, Any] = {}
+    ts: Optional[str] = None
+
+@app.post("/events/log")
+async def log_event(evt: BehaviorEvent):
+    e = evt.dict() if hasattr(evt, "dict") else evt.model_dump()
+    e["ts"] = e["ts"] or datetime.utcnow().isoformat()
+    EVENT_STORE.setdefault(evt.user_id, []).append(e)
+    EVENT_STORE[evt.user_id] = EVENT_STORE[evt.user_id][-200:]  # keep last 200
+    return {"ok": True, "event_count": len(EVENT_STORE[evt.user_id])}
+
+class AutoProfileUpdateRequest(BaseModel):
+    user_id: str
+
+    # optional overrides (otherwise uses app_config defaults via get_llm)
+    model_provider: Optional[str] = None
+    model_name: Optional[str] = None
+
+    # only needed if this is the FIRST time we create the profile
+    learning_goal: Optional[str] = None
+    learner_information: Optional[Any] = None
+    skill_gaps: Optional[Any] = None
+
+    # optional session metadata
+    session_information: Optional[Dict[str, Any]] = None
+
+
+@app.post("/profile/auto-update")
+async def auto_update_profile(request: AutoProfileUpdateRequest):
+    """
+    If profile doesn't exist: initialize it (needs learning_goal + learner_information + skill_gaps).
+    If profile exists: update it using EVENT_STORE[user_id] as learner_interactions.
+    """
+    try:
+        user_id = request.user_id
+        llm = get_llm(request.model_provider, request.model_name)  # uses defaults if None
+
+        # grab recent events for this user (can be empty)
+        interactions = EVENT_STORE.get(user_id, [])
+
+        # Normalize optional structured fields (match style used in /create-learner-profile-with-info)
+        learner_info = request.learner_information
+        if isinstance(learner_info, str):
+            try:
+                learner_info = ast.literal_eval(learner_info)
+            except Exception:
+                learner_info = {"raw": learner_info}
+
+        skill_gaps = request.skill_gaps
+        if isinstance(skill_gaps, str):
+            try:
+                skill_gaps = ast.literal_eval(skill_gaps)
+            except Exception:
+                skill_gaps = {"raw": skill_gaps}
+
+        # CASE A: first-time user => create profile
+        if user_id not in PROFILE_STORE:
+            if not (request.learning_goal and learner_info is not None and skill_gaps is not None):
+                raise HTTPException(
+                    status_code=400,
+                    detail="No profile found for this user_id. Provide learning_goal, learner_information, and skill_gaps to initialize."
+                )
+
+            profile = initialize_learner_profile_with_llm(
+                llm,
+                request.learning_goal,
+                learner_info,
+                skill_gaps,
+            )
+
+            PROFILE_STORE[user_id] = profile
+            return {
+                "ok": True,
+                "mode": "initialized",
+                "user_id": user_id,
+                "event_count_used": len(interactions),
+                "learner_profile": profile,
+            }
+
+        # CASE B: existing user => update profile from events
+        current_profile = PROFILE_STORE[user_id]
+
+        session_info = request.session_information or {}
+        session_info = {
+            **session_info,
+            "updated_at": datetime.utcnow().isoformat(),
+            "event_count": len(interactions),
+            "source": "EVENT_STORE",
+        }
+
+        updated_profile = update_learner_profile_with_llm(
+            llm,
+            current_profile,
+            interactions,
+            learner_info if learner_info is not None else "",
+            session_info,
+        )
+
+        PROFILE_STORE[user_id] = updated_profile
+
+        return {
+            "ok": True,
+            "mode": "updated",
+            "user_id": user_id,
+            "event_count_used": len(interactions),
+            "learner_profile": updated_profile,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Make Swagger show the real exception message
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/profile/{user_id}")
+async def get_profile(user_id: str):
+    profile = PROFILE_STORE.get(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="No profile found for this user_id")
+    return {"user_id": user_id, "learner_profile": profile}
+
+@app.get("/events/{user_id}")
+async def get_events(user_id: str):
+    return {"user_id": user_id, "events": EVENT_STORE.get(user_id, [])}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
