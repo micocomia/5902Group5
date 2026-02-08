@@ -273,6 +273,8 @@ def iterative_refine_learning_path(learner_profile, learning_path, max_iteration
 
 def get_user_state(backend_ep, user_id):
     """GET /user-state/{user_id} → (status_code, response_json)"""
+    if use_mock_data:
+        return 404, {"detail": "mock mode — no persisted state"}
     url = f"{backend_ep}user-state/{user_id}"
     try:
         resp = httpx.get(url, timeout=30)
@@ -283,6 +285,8 @@ def get_user_state(backend_ep, user_id):
 
 def save_user_state(backend_ep, user_id, state):
     """PUT /user-state/{user_id} → (status_code, response_json)"""
+    if use_mock_data:
+        return 200, {"ok": True}
     url = f"{backend_ep}user-state/{user_id}"
     try:
         resp = httpx.put(url, json={"state": state}, timeout=30)
@@ -293,6 +297,8 @@ def save_user_state(backend_ep, user_id, state):
 
 def delete_user_state(backend_ep, user_id):
     """DELETE /user-state/{user_id} → (status_code, response_json)"""
+    if use_mock_data:
+        return 200, {"ok": True}
     url = f"{backend_ep}user-state/{user_id}"
     try:
         resp = httpx.delete(url, timeout=30)
@@ -303,6 +309,8 @@ def delete_user_state(backend_ep, user_id):
 
 def auth_register(username, password):
     """Register a new user via the backend."""
+    if use_mock_data:
+        return 200, {"token": "mock-token", "username": username}
     data = {"username": username, "password": password}
     backend_url = f"{backend_endpoint}{API_NAMES['auth_register']}"
     try:
@@ -314,6 +322,8 @@ def auth_register(username, password):
 
 def auth_login(username, password):
     """Authenticate a user via the backend."""
+    if use_mock_data:
+        return 200, {"token": "mock-token", "username": username}
     data = {"username": username, "password": password}
     backend_url = f"{backend_endpoint}{API_NAMES['auth_login']}"
     try:
