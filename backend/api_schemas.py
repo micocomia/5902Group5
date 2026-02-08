@@ -1,6 +1,6 @@
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 class BaseRequest(BaseModel):
@@ -33,6 +33,8 @@ class LearnerProfileInitializationWithInfoRequest(BaseRequest):
     learning_goal: str
     learner_information: str
     skill_gaps: str
+    user_id: Optional[str] = None
+    goal_id: Optional[int] = None
 
 
 class LearnerProfileUpdateRequest(BaseRequest):
@@ -41,6 +43,8 @@ class LearnerProfileUpdateRequest(BaseRequest):
     learner_interactions: str
     learner_information: str = ""
     session_information: str = ""
+    user_id: Optional[str] = None
+    goal_id: Optional[int] = None
 
 
 class LearningPathSchedulingRequest(BaseRequest):
@@ -180,3 +184,17 @@ class IterativeRefinementRequest(BaseRequest):
     learner_profile: str
     learning_path: str
     max_iterations: int = 2
+
+
+class AuthRegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AuthLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserStateRequest(BaseModel):
+    state: Dict[str, Any]

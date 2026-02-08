@@ -1,12 +1,9 @@
+import time
 import streamlit as st
 from collections import defaultdict
 import config
-import json
-from pathlib import Path
 
 PERSIST_KEYS = [
-    "backend_endpoint",
-    "available_models",
     "if_complete_onboarding",
     "sample_number",
     "logged_in",
@@ -34,45 +31,65 @@ PERSIST_KEYS = [
     "if_refining_path",
 ]
 
-
-def _get_data_store_path():
-    return Path(__file__).resolve().parents[1] / "user_data" / "data_store.json"
+# Minimum interval between HTTP saves (seconds)
+_SAVE_DEBOUNCE_SECS = 1.0
 
 
 def load_persistent_state():
-    """Load persisted keys from a local JSON file into st.session_state.
+    """Load persisted keys from the backend into st.session_state."""
+    from utils.request_api import get_user_state as _api_get
 
-    Only keys listed in PERSIST_KEYS will be restored.
-    """
-    path = _get_data_store_path()
-    if not path.exists():
+    user_id = st.session_state.get("userId", "default")
+    backend_ep = st.session_state.get("backend_endpoint", config.backend_endpoint)
+    status, data = _api_get(backend_ep, user_id)
+    if status != 200:
         return False
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return False
-    for k, v in data.items():
+    state = data.get("state", {})
+    for k, v in state.items():
         if k in PERSIST_KEYS:
             st.session_state[k] = v
     return True
 
 
 def save_persistent_state():
-    """Save whitelisted st.session_state keys to a local JSON file."""
-    path = _get_data_store_path()
-    data = {}
+    """Save whitelisted st.session_state keys to the backend.
+
+    Debounced: at most one HTTP PUT per ``_SAVE_DEBOUNCE_SECS`` seconds.
+    The caller never needs to know whether the write was debounced away —
+    the final save at the end of each Streamlit rerun will always go through
+    because enough time will have elapsed (or because a new rerun starts).
+    """
+    from utils.request_api import save_user_state as _api_put
+
+    now = time.time()
+    last = st.session_state.get("_last_save_ts", 0.0)
+    if now - last < _SAVE_DEBOUNCE_SECS:
+        return True  # debounced — skip
+
+    user_id = st.session_state.get("userId", "default")
+    backend_ep = st.session_state.get("backend_endpoint", config.backend_endpoint)
+    payload = {}
     for k in PERSIST_KEYS:
         if k in st.session_state:
             try:
-                data[k] = st.session_state[k]
+                payload[k] = st.session_state[k]
             except Exception:
                 pass
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    status, _resp = _api_put(backend_ep, user_id, payload)
+    if status == 200:
+        st.session_state["_last_save_ts"] = now
         return True
-    except Exception:
-        return False
+    return False
+
+
+def delete_persistent_state():
+    """Delete the user's persisted state on the backend."""
+    from utils.request_api import delete_user_state as _api_del
+
+    user_id = st.session_state.get("userId", "default")
+    backend_ep = st.session_state.get("backend_endpoint", config.backend_endpoint)
+    status, _resp = _api_del(backend_ep, user_id)
+    return status == 200
 
 
 def initialize_session_state():
@@ -152,10 +169,15 @@ def initialize_session_state():
     if 'learned_skills_history' not in st.session_state:
         st.session_state['learned_skills_history'] = {}
 
-    try:
-        load_persistent_state()
-    except Exception:
-        pass
+    # Only load from the backend once per session.  Subsequent reruns keep
+    # the in-memory session_state as the source of truth; periodic
+    # save_persistent_state() calls flush it back to the backend.
+    if "_state_loaded" not in st.session_state:
+        try:
+            load_persistent_state()
+        except Exception:
+            pass
+        st.session_state["_state_loaded"] = True
 
 def get_new_goal_uid():
     return max(goal["id"] for goal in st.session_state.goals) + 1 if st.session_state.goals else 0

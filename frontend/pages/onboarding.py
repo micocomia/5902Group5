@@ -6,7 +6,7 @@ from components.goal_refinement import render_goal_refinement
 from utils.pdf import extract_text_from_pdf
 from utils.state import save_persistent_state, reset_to_add_goal
 from components.topbar import render_topbar
-from personas import PERSONAS
+from utils.personas import PERSONAS
 
 
 def on_refine_click():

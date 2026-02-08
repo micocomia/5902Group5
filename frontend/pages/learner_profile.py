@@ -5,7 +5,7 @@ from components.skill_info import render_skill_info
 from components.navigation import render_navigation
 from utils.pdf import extract_text_from_pdf
 from streamlit_extras.tags import tagger_component 
-from utils.state import save_persistent_state
+from utils.state import save_persistent_state, delete_persistent_state
 
 
 def render_learner_profile():
@@ -24,7 +24,7 @@ def render_learner_profile():
             st.error("An error occurred while rendering the learner profile.")
             # re generate the learner profile
             with st.spinner("Re-prepare your profile ..."):
-                learner_profile = create_learner_profile(goal["learning_goal"], st.session_state["learner_information"], goal["skill_gaps"], st.session_state["llm_type"])
+                learner_profile = create_learner_profile(goal["learning_goal"], st.session_state["learner_information"], goal["skill_gaps"], st.session_state["llm_type"], user_id=st.session_state.get("userId"), goal_id=st.session_state.get("selected_goal_id"))
             goal["learner_profile"] = learner_profile
             try:
                 save_persistent_state()
@@ -199,7 +199,7 @@ def render_additional_info_form(goal):
         
 def update_learner_profile_with_additional_info(goal, additional_info):
     additional_info = st.session_state["additional_info"]
-    new_learner_profile = update_learner_profile(goal["learner_profile"], additional_info)
+    new_learner_profile = update_learner_profile(goal["learner_profile"], additional_info, user_id=st.session_state.get("userId"), goal_id=st.session_state.get("selected_goal_id"))
     if new_learner_profile is not None:
         goal["learner_profile"] = new_learner_profile
         try:
@@ -211,4 +211,46 @@ def update_learner_profile_with_additional_info(goal, additional_info):
         st.toast("❌ Failed to update your profile. Please try again.")
 
 
+@st.dialog("Confirm Restart Onboarding")
+def show_restart_onboarding_dialog():
+    st.warning("All your progress will be cleared and you will be taken back to onboarding.")
+    st.divider()
+    col_confirm, _space, col_cancel = st.columns([1, 2, 0.7])
+    with col_confirm:
+        if st.button("Confirm", type="primary"):
+            # Keep the user logged in after clearing progress
+            user_id = st.session_state.get("userId", "default")
+            backend_ep = st.session_state.get("backend_endpoint")
+            try:
+                st.session_state["_autosave_enabled"] = False
+            except Exception:
+                pass
+            try:
+                delete_persistent_state()
+            except Exception:
+                pass
+            try:
+                st.session_state.clear()
+            except Exception:
+                pass
+            st.session_state["logged_in"] = True
+            st.session_state["userId"] = user_id
+            if backend_ep:
+                st.session_state["backend_endpoint"] = backend_ep
+            try:
+                st.switch_page("pages/onboarding.py")
+            except Exception:
+                st.rerun()
+    with col_cancel:
+        if st.button("Cancel"):
+            try:
+                st.rerun()
+            except Exception:
+                pass
+
+
 render_learner_profile()
+
+st.divider()
+if st.button("Restart Onboarding", icon=":material/restart_alt:", help="Clear all progress and start onboarding from scratch (keeps a backup)"):
+    show_restart_onboarding_dialog()

@@ -1,36 +1,80 @@
 import streamlit as st
 import config
-from utils.state import save_persistent_state
+from utils.state import save_persistent_state, load_persistent_state
 import requests
 import re
 from pathlib import Path
-from utils.request_api import get_available_models
+from utils.request_api import get_available_models, auth_register, auth_login
 
 
-@st.dialog("Login")
+@st.dialog("Login / Register")
 def login():
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.button("Submit", disabled=True):
-        st.session_state["logged_in"]  = True
-        try:
-            save_persistent_state()
-        except Exception:
-            pass
-        st.rerun()
-    # currently not available
-    st.warning("Unavailable in this demo version.")
+    login_tab, register_tab = st.tabs(["Login", "Register"])
+    with login_tab:
+        login_user = st.text_input("Username", key="login_username")
+        login_pass = st.text_input("Password", type="password", key="login_password")
+        if st.button("Login", key="login_submit"):
+            if not login_user or not login_pass:
+                st.error("Please enter both username and password.")
+            else:
+                status, data = auth_login(login_user, login_pass)
+                if status == 200:
+                    st.session_state["userId"] = data["username"]
+                    load_persistent_state()
+                    st.session_state["logged_in"] = True
+                    try:
+                        save_persistent_state()
+                    except Exception:
+                        pass
+                    st.rerun()
+                elif status == 401:
+                    st.error("Invalid username or password.")
+                elif status is None:
+                    st.error("Could not reach backend. Please check your settings.")
+                else:
+                    st.error(data.get("detail", "Login failed."))
+
+    with register_tab:
+        reg_user = st.text_input("Username", key="reg_username")
+        reg_pass = st.text_input("Password", type="password", key="reg_password")
+        reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm")
+        if st.button("Register", key="reg_submit"):
+            if not reg_user or not reg_pass:
+                st.error("Please fill in all fields.")
+            elif len(reg_user) < 3:
+                st.error("Username must be at least 3 characters.")
+            elif len(reg_pass) < 6:
+                st.error("Password must be at least 6 characters.")
+            elif reg_pass != reg_confirm:
+                st.error("Passwords do not match.")
+            else:
+                status, data = auth_register(reg_user, reg_pass)
+                if status == 200:
+                    st.session_state["logged_in"] = True
+                    st.session_state["userId"] = data["username"]
+                    try:
+                        save_persistent_state()
+                    except Exception:
+                        pass
+                    st.rerun()
+                elif status == 409:
+                    st.error("Username already exists. Please choose another.")
+                elif status is None:
+                    st.error("Could not reach backend. Please check your settings.")
+                else:
+                    st.error(data.get("detail", "Registration failed."))
+
 
 def logout():
     st.session_state["logged_in"] = False
-    try:
-        save_persistent_state()
-    except Exception:
-        pass
+    st.session_state["userId"] = "default"
+    st.session_state["if_complete_onboarding"] = False
+    st.session_state["goals"] = []
+    st.session_state["_navigated_lp_once"] = False
 
 
 def render_topbar():
-    col1, col2, col3, col4 = st.columns([1, 2, 6, 1])
+    col1, col3, col4 = st.columns([1, 8, 1])
     # first-time backend availability check
     if "checked_backend" not in st.session_state:
         st.session_state["checked_backend"] = False
@@ -55,30 +99,10 @@ def render_topbar():
         if st.button("", icon=":material/settings:", use_container_width=False):
             settings()
 
-    available_models = st.session_state.get("available_models", [])
-    if st.session_state["llm_type"] in available_models:
-        index = available_models.index(st.session_state["llm_type"])
-    else:
-        index = 0
-
-    with col2:
-        # st.button("GenMentor")
-        llm_label = st.selectbox(
-            "LLM Type",
-            available_models,
-            index=index,
-            label_visibility="collapsed",
-        )
-        if len(available_models) > 0 and llm_label != st.session_state["llm_type"]:
-            st.session_state["llm_type"] = llm_label
-            try:
-                save_persistent_state()
-            except Exception:
-                pass
-
     with col4:
         if st.session_state["logged_in"]:
             with st.popover("", icon=":material/account_circle:", use_container_width=True):
+                st.caption(f"Signed in as **{st.session_state.get('userId', '')}**")
                 logout_button = st.button("Log-out", icon=":material/exit_to_app:")
                 if logout_button:
                     logout()

@@ -5,7 +5,7 @@ import uvicorn
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header
 from io import BytesIO
 import pdfplumber
 from base.llm_factory import LLMFactory
@@ -19,6 +19,8 @@ from modules.personalized_resource_delivery.agents.learning_path_scheduler impor
 from modules.ai_chatbot_tutor import chat_with_tutor_with_llm
 from api_schemas import *
 from config import load_config
+from utils import store
+from utils import auth_store, auth_jwt
 
 app_config = load_config(config_name="main")
 search_rag_manager = SearchRagManager.from_config(app_config)
@@ -28,9 +30,11 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-# MVP in-memory stores (replace with DB later)
-PROFILE_STORE: Dict[str, Dict[str, Any]] = {}
-EVENT_STORE: Dict[str, List[Dict[str, Any]]] = {}
+
+@app.on_event("startup")
+def _load_stores():
+    store.load()
+    auth_store.load()
 
 class BehaviorEvent(BaseModel):
     user_id: str
@@ -42,12 +46,12 @@ class BehaviorEvent(BaseModel):
 async def log_event(evt: BehaviorEvent):
     e = evt.dict() if hasattr(evt, "dict") else evt.model_dump()
     e["ts"] = e["ts"] or datetime.utcnow().isoformat()
-    EVENT_STORE.setdefault(evt.user_id, []).append(e)
-    EVENT_STORE[evt.user_id] = EVENT_STORE[evt.user_id][-200:]  # keep last 200
-    return {"ok": True, "event_count": len(EVENT_STORE[evt.user_id])}
+    store.append_event(evt.user_id, e)
+    return {"ok": True, "event_count": len(store.get_events(evt.user_id))}
 
 class AutoProfileUpdateRequest(BaseModel):
     user_id: str
+    goal_id: int = 0
 
     # optional overrides (otherwise uses app_config defaults via get_llm)
     model_provider: Optional[str] = None
@@ -72,8 +76,10 @@ async def auto_update_profile(request: AutoProfileUpdateRequest):
         user_id = request.user_id
         llm = get_llm(request.model_provider, request.model_name)  # uses defaults if None
 
+        goal_id = request.goal_id
+
         # grab recent events for this user (can be empty)
-        interactions = EVENT_STORE.get(user_id, [])
+        interactions = store.get_events(user_id)
 
         # Normalize optional structured fields (match style used in /create-learner-profile-with-info)
         learner_info = request.learner_information
@@ -91,7 +97,7 @@ async def auto_update_profile(request: AutoProfileUpdateRequest):
                 skill_gaps = {"raw": skill_gaps}
 
         # CASE A: first-time user => create profile
-        if user_id not in PROFILE_STORE:
+        if store.get_profile(user_id, goal_id) is None:
             if not (request.learning_goal and learner_info is not None and skill_gaps is not None):
                 raise HTTPException(
                     status_code=400,
@@ -105,17 +111,18 @@ async def auto_update_profile(request: AutoProfileUpdateRequest):
                 skill_gaps,
             )
 
-            PROFILE_STORE[user_id] = profile
+            store.upsert_profile(user_id, goal_id, profile)
             return {
                 "ok": True,
                 "mode": "initialized",
                 "user_id": user_id,
+                "goal_id": goal_id,
                 "event_count_used": len(interactions),
                 "learner_profile": profile,
             }
 
         # CASE B: existing user => update profile from events
-        current_profile = PROFILE_STORE[user_id]
+        current_profile = store.get_profile(user_id, goal_id)
 
         session_info = request.session_information or {}
         session_info = {
@@ -133,12 +140,13 @@ async def auto_update_profile(request: AutoProfileUpdateRequest):
             session_info,
         )
 
-        PROFILE_STORE[user_id] = updated_profile
+        store.upsert_profile(user_id, goal_id, updated_profile)
 
         return {
             "ok": True,
             "mode": "updated",
             "user_id": user_id,
+            "goal_id": goal_id,
             "event_count_used": len(interactions),
             "learner_profile": updated_profile,
         }
@@ -151,15 +159,41 @@ async def auto_update_profile(request: AutoProfileUpdateRequest):
 
 
 @app.get("/profile/{user_id}")
-async def get_profile(user_id: str):
-    profile = PROFILE_STORE.get(user_id)
-    if not profile:
+async def get_profile(user_id: str, goal_id: Optional[int] = None):
+    if goal_id is not None:
+        profile = store.get_profile(user_id, goal_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="No profile found for this user_id and goal_id")
+        return {"user_id": user_id, "goal_id": goal_id, "learner_profile": profile}
+    profiles = store.get_all_profiles_for_user(user_id)
+    if not profiles:
         raise HTTPException(status_code=404, detail="No profile found for this user_id")
-    return {"user_id": user_id, "learner_profile": profile}
+    return {"user_id": user_id, "profiles": profiles}
 
 @app.get("/events/{user_id}")
 async def get_events(user_id: str):
-    return {"user_id": user_id, "events": EVENT_STORE.get(user_id, [])}
+    return {"user_id": user_id, "events": store.get_events(user_id)}
+
+
+@app.get("/user-state/{user_id}")
+async def get_user_state(user_id: str):
+    state = store.get_user_state(user_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="No state found for this user_id")
+    return {"state": state}
+
+
+@app.put("/user-state/{user_id}")
+async def put_user_state(user_id: str, body: UserStateRequest):
+    store.put_user_state(user_id, body.state)
+    return {"ok": True}
+
+
+@app.delete("/user-state/{user_id}")
+async def delete_user_state(user_id: str):
+    store.delete_user_state(user_id)
+    return {"ok": True}
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -168,6 +202,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.post("/auth/register")
+async def auth_register(request: AuthRegisterRequest):
+    if len(request.username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if len(request.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    try:
+        auth_store.create_user(request.username, request.password)
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Username already exists")
+    token = auth_jwt.create_token(request.username)
+    return {"token": token, "username": request.username}
+
+
+@app.post("/auth/login")
+async def auth_login(request: AuthLoginRequest):
+    if not auth_store.verify_password(request.username, request.password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = auth_jwt.create_token(request.username)
+    return {"token": token, "username": request.username}
+
+
+@app.get("/auth/me")
+async def auth_me(authorization: str = Header("")):
+    token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
+    username = auth_jwt.verify_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return {"username": username}
+
 
 def get_llm(model_provider: str | None = None, model_name: str | None = None, **kwargs):
     model_provider = model_provider or app_config.llm.provider
@@ -266,6 +332,8 @@ async def create_learner_profile_with_info(request: LearnerProfileInitialization
         learner_profile = initialize_learner_profile_with_llm(
             llm, learning_goal, learner_information, skill_gaps
         )
+        if request.user_id is not None and request.goal_id is not None:
+            store.upsert_profile(request.user_id, request.goal_id, learner_profile)
         return {"learner_profile": learner_profile}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -293,6 +361,8 @@ async def update_learner_profile(request: LearnerProfileUpdateRequest):
             locals()["learner_information"],
             locals()["session_information"],
         )
+        if request.user_id is not None and request.goal_id is not None:
+            store.upsert_profile(request.user_id, request.goal_id, learner_profile)
         return {"learner_profile": learner_profile}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

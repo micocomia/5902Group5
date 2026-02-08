@@ -4,6 +4,8 @@ import streamlit as st
 from config import backend_endpoint, use_mock_data, use_search
 
 API_NAMES = {
+    "auth_register": "auth/register",
+    "auth_login": "auth/login",
     "chat_with_tutor": "chat-with-tutor",
     "refine_goal": "refine-learning-goal",
     "identify_skill_gap": "identify-skill-gap-with-info",
@@ -105,7 +107,7 @@ def identify_skill_gap(learning_goal, learner_information, llm_type="gpt4o", met
     return response.get("skill_gaps") if response else None
 
 @st.cache_resource
-def create_learner_profile(learning_goal, learner_information, skill_gaps, llm_type="gpt4o", method_name="genmentor"):
+def create_learner_profile(learning_goal, learner_information, skill_gaps, llm_type="gpt4o", method_name="genmentor", user_id=None, goal_id=None):
     data = {
         "learning_goal": str(learning_goal),
         "learner_information": str(learner_information),
@@ -113,10 +115,14 @@ def create_learner_profile(learning_goal, learner_information, skill_gaps, llm_t
         "llm_type": str(llm_type),
         "method_name": str(method_name),
     }
+    if user_id is not None:
+        data["user_id"] = user_id
+    if goal_id is not None:
+        data["goal_id"] = goal_id
     response = make_post_request(API_NAMES["create_profile"], data, "./assets/data_example/learner_profile.json")
     return response.get("learner_profile") if response else None
 
-def update_learner_profile(learner_profile, learner_interactions, learner_information="", session_information="", llm_type="gpt4o", method_name="genmentor"):
+def update_learner_profile(learner_profile, learner_interactions, learner_information="", session_information="", llm_type="gpt4o", method_name="genmentor", user_id=None, goal_id=None):
     data = {
         "learner_profile": str(learner_profile),
         "learner_interactions": str(learner_interactions),
@@ -125,6 +131,10 @@ def update_learner_profile(learner_profile, learner_interactions, learner_inform
         "llm_type": str(llm_type),
         "method_name": str(method_name),
     }
+    if user_id is not None:
+        data["user_id"] = user_id
+    if goal_id is not None:
+        data["goal_id"] = goal_id
     response = make_post_request(API_NAMES["update_profile"], data, "./assets/data_example/learner_profile.json")
     return response.get("learner_profile") if response else None
 
@@ -259,3 +269,55 @@ def iterative_refine_learning_path(learner_profile, learning_path, max_iteration
             "iterations": response.get("iterations", [])
         }
     return None
+
+
+def get_user_state(backend_ep, user_id):
+    """GET /user-state/{user_id} → (status_code, response_json)"""
+    url = f"{backend_ep}user-state/{user_id}"
+    try:
+        resp = httpx.get(url, timeout=30)
+        return resp.status_code, resp.json()
+    except Exception as e:
+        return None, {"detail": str(e)}
+
+
+def save_user_state(backend_ep, user_id, state):
+    """PUT /user-state/{user_id} → (status_code, response_json)"""
+    url = f"{backend_ep}user-state/{user_id}"
+    try:
+        resp = httpx.put(url, json={"state": state}, timeout=30)
+        return resp.status_code, resp.json()
+    except Exception as e:
+        return None, {"detail": str(e)}
+
+
+def delete_user_state(backend_ep, user_id):
+    """DELETE /user-state/{user_id} → (status_code, response_json)"""
+    url = f"{backend_ep}user-state/{user_id}"
+    try:
+        resp = httpx.delete(url, timeout=30)
+        return resp.status_code, resp.json()
+    except Exception as e:
+        return None, {"detail": str(e)}
+
+
+def auth_register(username, password):
+    """Register a new user via the backend."""
+    data = {"username": username, "password": password}
+    backend_url = f"{backend_endpoint}{API_NAMES['auth_register']}"
+    try:
+        response = httpx.post(backend_url, json=data, timeout=30)
+        return response.status_code, response.json()
+    except Exception as e:
+        return None, {"detail": str(e)}
+
+
+def auth_login(username, password):
+    """Authenticate a user via the backend."""
+    data = {"username": username, "password": password}
+    backend_url = f"{backend_endpoint}{API_NAMES['auth_login']}"
+    try:
+        response = httpx.post(backend_url, json=data, timeout=30)
+        return response.status_code, response.json()
+    except Exception as e:
+        return None, {"detail": str(e)}

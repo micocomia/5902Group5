@@ -6,7 +6,7 @@ import streamlit as st
 from components.topbar import render_topbar
 from config import backend_endpoint, use_mock_data
 from components.gap_identification import render_identifying_skill_gap, render_identified_skill_gap
-from utils.state import add_new_goal, reset_to_add_goal, save_persistent_state
+from utils.state import add_new_goal, get_new_goal_uid, reset_to_add_goal, save_persistent_state
 from utils.request_api import identify_skill_gap, create_learner_profile
 
 
@@ -36,7 +36,7 @@ def render_skill_gap():
                 if st.button("Schedule Learning Path", type="primary", disabled=not if_schedule_learning_path_ready):
                     if skill_gaps and not goal.get("learner_profile"):
                         with st.spinner('Creating your profile ...'):
-                            learner_profile = create_learner_profile(goal["learning_goal"], st.session_state["learner_information"], skill_gaps)
+                            learner_profile = create_learner_profile(goal["learning_goal"], st.session_state["learner_information"], skill_gaps, user_id=st.session_state.get("userId"), goal_id=get_new_goal_uid())
                             if learner_profile is None:
                                 st.rerun()
                             goal["learner_profile"] = learner_profile

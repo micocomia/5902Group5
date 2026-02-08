@@ -503,7 +503,7 @@ def update_learner_profile_with_feedback(goal, feedback_data, session_informatio
     if session_information != "":
         session_information = copy.deepcopy(session_information)
         session_information["if_learned"] = True
-    new_learner_profile = update_learner_profile(goal["learner_profile"], feedback_data, session_information=session_information)
+    new_learner_profile = update_learner_profile(goal["learner_profile"], feedback_data, session_information=session_information, user_id=st.session_state.get("userId"), goal_id=st.session_state.get("selected_goal_id"))
     if new_learner_profile is None:
         st.error("Failed to update learner profile. Please try again.")
         return False
