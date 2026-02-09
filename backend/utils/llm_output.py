@@ -3,13 +3,28 @@ import json
 from typing import Dict, Any
 
 
+def _fix_invalid_escapes(s: str) -> str:
+    """Replace invalid JSON backslash escapes with double-backslashes.
+
+    JSON only allows: \\", \\\\, \\/, \\b, \\f, \\n, \\r, \\t, \\uXXXX.
+    Any other \\X sequence (e.g. \\S from LaTeX) is invalid and will cause
+    json.loads to fail.  This helper doubles those backslashes so the
+    literal text is preserved.
+    """
+    return re.sub(
+        r'\\(?!["\\/bfnrtu])',
+        r'\\\\',
+        s,
+    )
+
+
 def convert_json_output(output: str) -> Dict[str, Any]:
     """
     Convert raw JSON output from the LLM into structured format.
 
     Args:
         output: The JSON output from the LLM
-        
+
     Returns:
         Structured JSON output
     """
@@ -24,14 +39,24 @@ def convert_json_output(output: str) -> Dict[str, Any]:
         # Attempt to parse the output as JSON
         return json.loads(output)
     except json.JSONDecodeError:
-        # If parsing fails, try to extract JSON from the output string
-        start_idx = output.find('{')
-        end_idx = output.rfind('}') + 1
-        if start_idx != -1 and end_idx != 0:
-            json_str = output[start_idx:end_idx]
+        pass
+    # Fix invalid escape sequences and retry
+    fixed = _fix_invalid_escapes(output)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+    # Try to extract JSON object from the output string
+    start_idx = output.find('{')
+    end_idx = output.rfind('}') + 1
+    if start_idx != -1 and end_idx != 0:
+        json_str = output[start_idx:end_idx]
+        try:
             return json.loads(json_str)
-        else:
-            raise json.JSONDecodeError("No valid JSON found in response", output, 0)
+        except json.JSONDecodeError:
+            json_str = _fix_invalid_escapes(json_str)
+            return json.loads(json_str)
+    raise json.JSONDecodeError("No valid JSON found in response", output, 0)
 
 def get_text_from_response(response):
     """Extract text from the response object."""

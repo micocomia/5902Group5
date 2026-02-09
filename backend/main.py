@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("USER_AGENT", "GenMentor/1.0 (educational-platform)")
+
 import ast
 import json
 import time
@@ -584,6 +587,6 @@ async def iterative_refine_path(request: IterativeRefinementRequest):
 if __name__ == "__main__":
     server_cfg = app_config.get("server", {})
     host = app_config.get("server", {}).get("host", "127.0.0.1")
-    port = int(app_config.get("server", {}).get("port", 5000))
+    port = int(app_config.get("server", {}).get("port", 8000))
     log_level = str(app_config.get("log_level", "debug")).lower()
     uvicorn.run(app, host=host, port=port, log_level=log_level)

@@ -121,7 +121,7 @@ def settings():
     # current backend endpoint
     is_valid_backend = False
     if_check_api = False
-    cur_backend = getattr(config, "backend_endpoint", "http://127.0.0.1:5006/")
+    cur_backend = getattr(config, "backend_endpoint", "http://127.0.0.1:8000/")
     new_backend = st.text_input("Backend endpoint (include protocol and port)", value=cur_backend)
 
     st.markdown("---")
@@ -158,5 +158,5 @@ def settings():
 
     if not is_valid_backend:
         st.warning("Backend endpoint not reachable or invalid.")
-        st.info("Ensure the GenMentor backend API is running and the endpoint is correct, including protocol and port (e.g., http://127.0.0.1:5000/).")
+        st.info("Ensure the GenMentor backend API is running and the endpoint is correct, including protocol and port (e.g., http://127.0.0.1:8000/).")
         st.info("Please refer to the [GenMentor Backend Setup Instructions](https://github.com/GeminiLight/gen-mentor/blob/main/backend/README.md) for more details on how to set up and run the backend service.")
