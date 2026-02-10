@@ -28,6 +28,8 @@ def _isolate_store(tmp_path, monkeypatch):
     monkeypatch.setattr(store, "_EVENTS_PATH", data_dir / "events.json")
     monkeypatch.setattr(store, "_profiles", {})
     monkeypatch.setattr(store, "_events", {})
+    monkeypatch.setattr(store, "_USER_STATES_PATH", data_dir / "user_states.json")
+    monkeypatch.setattr(store, "_user_states", {})
 
 
 @pytest.fixture(autouse=True)
@@ -201,6 +203,58 @@ class TestAuthStore:
         assert auth_store.verify_password("bob", "pass2") is True
         # cross-check: alice's password doesn't work for bob
         assert auth_store.verify_password("bob", "pass1") is False
+
+    def test_delete_user(self):
+        auth_store.create_user("alice", "secret123")
+        assert auth_store.delete_user("alice") is True
+        assert auth_store.get_user("alice") is None
+
+    def test_delete_user_nonexistent_returns_false(self):
+        assert auth_store.delete_user("nobody") is False
+
+    def test_delete_user_persisted_to_disk(self):
+        auth_store.create_user("alice", "secret123")
+        auth_store.delete_user("alice")
+
+        # reload from disk and verify user is gone
+        auth_store._users.clear()
+        auth_store.load()
+        assert auth_store.get_user("alice") is None
+
+
+# ===================================================================
+# store.py – delete_all_user_data
+# ===================================================================
+
+class TestDeleteAllUserData:
+    def test_delete_all_user_data_removes_profiles(self):
+        store.upsert_profile("alice", 0, {"goal": "Python"})
+        store.upsert_profile("alice", 1, {"goal": "Rust"})
+        store.upsert_profile("bob", 0, {"goal": "Go"})
+
+        store.delete_all_user_data("alice")
+
+        assert store.get_profile("alice", 0) is None
+        assert store.get_profile("alice", 1) is None
+        assert store.get_profile("bob", 0) == {"goal": "Go"}
+
+    def test_delete_all_user_data_removes_events(self):
+        store.append_event("alice", {"type": "click"})
+        store.append_event("bob", {"type": "scroll"})
+
+        store.delete_all_user_data("alice")
+
+        assert store.get_events("alice") == []
+        assert len(store.get_events("bob")) == 1
+
+    def test_delete_all_user_data_removes_user_state(self):
+        store.put_user_state("alice", {"theme": "dark"})
+        store.put_user_state("bob", {"theme": "light"})
+
+        store.delete_all_user_data("alice")
+
+        assert store.get_user_state("alice") is None
+        assert store.get_user_state("bob") == {"theme": "light"}
 
 
 # ===================================================================

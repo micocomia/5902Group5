@@ -55,3 +55,10 @@ def verify_password(username: str, password: str) -> bool:
 
 def get_user(username: str) -> Optional[Dict[str, Any]]:
     return _users.get(username)
+
+
+def delete_user(username: str) -> bool:
+    with _lock:
+        removed = _users.pop(username, None)
+        _flush()
+        return removed is not None

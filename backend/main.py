@@ -238,6 +238,18 @@ async def auth_me(authorization: str = Header("")):
     return {"username": username}
 
 
+@app.delete("/auth/user")
+async def auth_delete_user(authorization: str = Header("")):
+    token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
+    username = auth_jwt.verify_token(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if not auth_store.delete_user(username):
+        raise HTTPException(status_code=404, detail="User not found")
+    store.delete_all_user_data(username)
+    return {"ok": True}
+
+
 def get_llm(model_provider: str | None = None, model_name: str | None = None, **kwargs):
     model_provider = model_provider or app_config.llm.provider
     model_name = model_name or app_config.llm.model_name

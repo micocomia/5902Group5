@@ -110,3 +110,21 @@ def delete_user_state(user_id: str):
     with _lock:
         _user_states.pop(user_id, None)
         _flush_user_states()
+
+
+def delete_all_user_data(user_id: str):
+    with _lock:
+        # Remove profiles (keyed as "user_id:goal_id")
+        prefix = f"{user_id}:"
+        keys_to_remove = [k for k in _profiles if k.startswith(prefix)]
+        for k in keys_to_remove:
+            del _profiles[k]
+        _flush_profiles()
+
+        # Remove events
+        _events.pop(user_id, None)
+        _flush_events()
+
+        # Remove user state
+        _user_states.pop(user_id, None)
+        _flush_user_states()

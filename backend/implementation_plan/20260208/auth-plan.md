@@ -42,6 +42,7 @@ Mirrors `utils/store.py` pattern. Stores users in `backend/data/users.json` (alr
 - `create_user(username, password)` — hash with `bcrypt.hashpw()`, flush to disk, raise `ValueError` if exists
 - `verify_password(username, password)` — `bcrypt.checkpw()` against stored hash
 - `get_user(username)` — lookup
+- `delete_user(username)` — remove user from `_users` dict, flush to disk, return `True` if user existed / `False` otherwise
 - Thread lock on writes
 
 ### Step 3: `backend/utils/auth_jwt.py` (new)
@@ -66,6 +67,14 @@ Add after existing schemas:
   - `POST /auth/register` — validate (username >= 3 chars, password >= 6 chars), call `auth_store.create_user()`, return JWT + username
   - `POST /auth/login` — call `auth_store.verify_password()`, return JWT + username
   - `GET /auth/me` — verify JWT from `authorization` header, return username (React readiness; Streamlit won't use this)
+  - `DELETE /auth/user` — verify JWT from `authorization` header, delete user credentials via `auth_store.delete_user()`, delete all associated data (profiles, events, user state) via `store.delete_all_user_data()`, return `{"ok": True}`
+
+### Step 5b: `backend/utils/store.py` — Add `delete_all_user_data()`
+
+Add a function that removes all data associated with a user under a single lock:
+- Remove profiles keyed as `"user_id:goal_id"` by prefix match, flush
+- Remove events entry for the user, flush
+- Remove user state entry for the user, flush
 
 ### Step 6: `backend/.env.example`
 
@@ -106,6 +115,24 @@ if not st.session_state.get("logged_in", False):
 
 This blocks all navigation until the user is authenticated.
 
+## Tests (`backend/tests/test_store_and_auth.py`)
+
+Unit tests cover:
+
+**`TestAuthStore`** — user creation, password verification, duplicate rejection, disk persistence, plus:
+- `test_delete_user` — create user, delete, verify `get_user` returns `None`
+- `test_delete_user_nonexistent_returns_false` — deleting unknown user returns `False`
+- `test_delete_user_persisted_to_disk` — deleted user is gone from JSON file after reload
+
+**`TestDeleteAllUserData`** — verifies `delete_all_user_data()`:
+- `test_delete_all_user_data_removes_profiles` — profiles for user removed, other users' profiles unaffected
+- `test_delete_all_user_data_removes_events` — events for user removed, others unaffected
+- `test_delete_all_user_data_removes_user_state` — user state removed, others unaffected
+
+Note: The `_isolate_store` fixture must also reset `_USER_STATES_PATH` and `_user_states` for user state tests.
+
+Run: `pytest backend/tests/test_store_and_auth.py -v`
+
 ## Verification
 
 1. Start backend, call `POST /auth/register` with `{"username": "alice", "password": "test123"}` — expect 200 with token
@@ -113,7 +140,9 @@ This blocks all navigation until the user is authenticated.
 3. Call `POST /auth/register` with same username — expect 409 conflict
 4. Call `POST /auth/login` with wrong password — expect 401
 5. Check `backend/data/users.json` exists with hashed password
-6. Start frontend — should see login/register page, not onboarding
-7. Register a new user, confirm redirect to onboarding
-8. Complete onboarding flow, logout, login as different user — confirm separate goals/profiles
-9. Check `frontend/user_data/` has separate `data_store_{username}.json` files
+6. Call `DELETE /auth/user` with valid JWT in `Authorization: Bearer <token>` header — expect 200 `{"ok": true}`, user removed from `users.json`, all profiles/events/state for that user cleared
+7. Call `DELETE /auth/user` with invalid/expired token — expect 401
+8. Start frontend — should see login/register page, not onboarding
+9. Register a new user, confirm redirect to onboarding
+10. Complete onboarding flow, logout, login as different user — confirm separate goals/profiles
+11. Check `frontend/user_data/` has separate `data_store_{username}.json` files
