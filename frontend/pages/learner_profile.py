@@ -84,42 +84,61 @@ def render_cognitive_status(goal):
 
 def render_learning_preferences(goal):
     learner_profile = goal["learner_profile"]
-    prefs = learner_profile['learning_preferences']
+    prefs = learner_profile.get('learning_preferences', {})
     st.markdown("#### 📚 Learning Preferences")
 
     # Display FSLSM dimensions
     st.write("**FSLSM Learning Style Dimensions:**")
-    dims = prefs.get('fslsm_dimensions', {})
-    dimension_labels = [
-        ("fslsm_processing", "Active", "Reflective"),
-        ("fslsm_perception", "Sensing", "Intuitive"),
-        ("fslsm_input", "Visual", "Verbal"),
-        ("fslsm_understanding", "Sequential", "Global"),
+    dims = prefs.get('fslsm_dimensions') or {}
+
+    def _get_dim(d: dict, name: str, default: float = 0.0) -> float:
+        """Accept either {"processing": x} or {"fslsm_processing": x}."""
+        if name in d:
+            v = d.get(name)
+        else:
+            v = d.get(f"fslsm_{name}")
+        try:
+            return float(v)
+        except Exception:
+            return float(default)
+
+    processing = _get_dim(dims, "processing")
+    perception = _get_dim(dims, "perception")
+    inp = _get_dim(dims, "input")
+    understanding = _get_dim(dims, "understanding")
+
+    # Raw vector display (helps verify how it varies across runs/goals)
+    st.caption("Raw FSLSM vector (−1.0 to +1.0):")
+    st.table({
+        "dimension": ["processing", "perception", "input", "understanding"],
+        "value": [processing, perception, inp, understanding],
+    })
+
+    slider_specs = [
+        ("processing", "Active", "Reflective", processing),
+        ("perception", "Sensing", "Intuitive", perception),
+        ("input", "Visual", "Verbal", inp),
+        ("understanding", "Sequential", "Global", understanding),
     ]
-    for key, left_label, right_label in dimension_labels:
-        value = dims.get(key, 0.0)
+
+    for name, left_label, right_label, value in slider_specs:
         col1, col2, col3 = st.columns([1, 3, 1])
         with col1:
             st.markdown(f"**{left_label}**")
         with col2:
             st.slider(
-                label=key,
+                label=name,
                 min_value=-1.0,
                 max_value=1.0,
                 value=float(value),
                 step=0.1,
                 disabled=True,
                 label_visibility="collapsed",
-                key=f"fslsm_{key}",
+                # stable key; avoids accidental "fslsm_fslsm_processing" etc.
+                key=f"fslsm_slider_{name}",
             )
         with col3:
             st.markdown(f"**{right_label}**")
-
-    # Display computed summaries derived from FSLSM dimensions
-    perception = dims.get("fslsm_perception", 0.0)
-    understanding = dims.get("fslsm_understanding", 0.0)
-    processing = dims.get("fslsm_processing", 0.0)
-    inp = dims.get("fslsm_input", 0.0)
 
     if perception <= -0.3:
         cs_part1 = "Concrete examples and practical applications"
