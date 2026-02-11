@@ -12,6 +12,47 @@ from utils.request_api import (
 from components.navigation import render_navigation
 from utils.state import save_persistent_state
 
+def _get_selected_goal():
+    """Return the currently selected goal dict from st.session_state.
+    Supports:
+      - goals as dict keyed by goal_id
+      - goals as list of goal dicts
+    """
+    selected_goal_id = st.session_state.get("selected_goal_id")
+    goals = st.session_state.get("goals")
+
+    if isinstance(goals, dict):
+        if selected_goal_id is not None:
+            if selected_goal_id in goals and isinstance(goals[selected_goal_id], dict):
+                return goals[selected_goal_id]
+            if str(selected_goal_id) in goals and isinstance(goals[str(selected_goal_id)], dict):
+                return goals[str(selected_goal_id)]
+            try:
+                sid_int = int(selected_goal_id)
+                if sid_int in goals and isinstance(goals[sid_int], dict):
+                    return goals[sid_int]
+            except Exception:
+                pass
+            for g in goals.values():
+                if isinstance(g, dict) and str(g.get("id")) == str(selected_goal_id):
+                    return g
+        for g in goals.values():
+            if isinstance(g, dict):
+                return g
+        return None
+
+    if isinstance(goals, list):
+        if selected_goal_id is not None:
+            for g in goals:
+                if isinstance(g, dict) and str(g.get("id")) == str(selected_goal_id):
+                    return g
+        for g in goals:
+            if isinstance(g, dict):
+                return g
+        return None
+
+    return None
+
 
 def _store_agent_reasoning(result, context: str = ""):
     """Store any agent reasoning/trace returned by backend into Streamlit session_state.
@@ -57,7 +98,10 @@ def render_learning_path():
     if not st.session_state.get("if_complete_onboarding"):
         st.switch_page("pages/onboarding.py")
 
-    goal = st.session_state["goals"][st.session_state["selected_goal_id"]]
+    goal = _get_selected_goal()
+    if not isinstance(goal, dict):
+        st.info("No goal selected yet (or goals data not loaded). Go to Onboarding / Goal Management first.")
+        return
     save_persistent_state()
     if not goal["learning_goal"] or not st.session_state["learner_information"]:
         st.switch_page("pages/onboarding.py")
@@ -77,14 +121,56 @@ def render_learning_path():
         }
         </style>
     """, unsafe_allow_html=True)
-    if not goal["learning_path"]:
-        with st.spinner('Scheduling Learning Path ...'):
-            result = schedule_learning_path(goal["learner_profile"], session_count=8)
-            _store_agent_reasoning(result, "schedule_learning_path")
-            goal["learning_path"] = result.get("learning_path", result) if isinstance(result, dict) else result
+    
+    if not goal.get("learning_path"):
+
+        goal_id = goal.get("id", st.session_state.get("selected_goal_id"))
+        attempt_key = f"learning_path_schedule_attempted_{goal_id}"
+
+        # Avoid infinite rerun loops if scheduling fails
+        if st.session_state.get(attempt_key):
+            st.warning("Learning path is not available yet.")
+            if st.button("Retry scheduling learning path", type="primary"):
+                st.session_state[attempt_key] = False
+                try:
+                    save_persistent_state()
+                except Exception:
+                    pass
+                st.rerun()
+            return
+
+        with st.spinner("Scheduling Learning Path ..."):
+            st.session_state[attempt_key] = True
+
+            result = schedule_learning_path(
+                learner_profile=goal.get("learner_profile"),
+                session_count=8,
+            )
+
+        _store_agent_reasoning(result, "schedule_learning_path")
+
+        # Backend may return either a dict {learning_path: [...]} or a raw list
+        if isinstance(result, dict):
+            if "detail" in result and not result.get("learning_path"):
+                st.error("Backend rejected the schedule request (422).")
+                st.json(result)
+                return
+            learning_path = result.get("learning_path")
+        else:
+            learning_path = result
+
+        if not learning_path:
+            st.error("Scheduling returned an empty learning path.")
+            return
+
+        goal["learning_path"] = learning_path
+        try:
             save_persistent_state()
-            st.toast("🎉 Successfully schedule learning path!")
-            st.rerun()
+        except Exception:
+            pass
+        st.toast("🎉 Successfully scheduled learning path!")
+        st.rerun()
+
     else:
         render_overall_information(goal)
         render_path_feedback_section(goal)

@@ -301,19 +301,19 @@ def update_learner_profile(learner_profile, learner_interactions, learner_inform
 
 # @st.cache_resource
 def schedule_learning_path(learner_profile, session_count=None, llm_type="gpt4o", method_name="genmentor"):
-    # Backend expects learner_profile as a string.
+    # Backend expects learner_profile as an object (dict), not a string.
     # session_count must be an int.
     try:
         session_count_int = int(session_count) if session_count is not None else 5
     except Exception:
         session_count_int = 5
+
     data = {
-        "learner_profile": str(learner_profile),
+        "learner_profile": _coerce_jsonable(learner_profile),
         "session_count": session_count_int,
-        "llm_type": str(llm_type),
-        "method_name": str(method_name),
     }
-    response = make_post_request(API_NAMES["schedule_path"], data, "./assets/data_example/learning_path.json")
+
+    response = make_post_request(API_NAMES["schedule_path"], data)
     return response.get("learning_path") if response else None
 
 def reschedule_learning_path(learning_path, learner_profile, session_count, other_feedback="", llm_type="gpt4o", method_name="genmentor"):

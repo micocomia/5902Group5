@@ -29,6 +29,22 @@ def render_add_new_goal():
         except Exception:
             pass
 
+
+
+# Ensure required session_state keys exist (avoid KeyError on fresh sessions)
+if "to_add_goal" not in st.session_state or not isinstance(st.session_state.get("to_add_goal"), dict):
+    reset_to_add_goal()
+    try:
+        save_persistent_state()
+    except Exception:
+        pass
+if "goals" not in st.session_state or st.session_state.get("goals") is None:
+    st.session_state["goals"] = []
+    try:
+        save_persistent_state()
+    except Exception:
+        pass
+
     to_add_goal = st.session_state["to_add_goal"]
     st.subheader("🎯 Add New Goal")
     new_learning_goal = st.text_area("Enter your new goal:", to_add_goal["learning_goal"], key="new_learning_goal")
@@ -58,10 +74,17 @@ def render_add_new_goal():
 
 def render_existing_goals():
     st.subheader("📋 Existing Goals")
-    goals = st.session_state["goals"]
-    non_deleted_goals = [goal for goal in goals if not goal["is_deleted"]]
+    goals_raw = st.session_state.get("goals", [])
+# Normalize goals to a list of goal dicts
+if isinstance(goals_raw, dict):
+    goals = [g for g in goals_raw.values() if isinstance(g, dict)]
+elif isinstance(goals_raw, list):
+    goals = [g for g in goals_raw if isinstance(g, dict)]
+else:
+    goals = []
 
-    for goal_id, goal in enumerate(non_deleted_goals):
+non_deleted_goals = [goal for goal in goals if not goal.get("is_deleted")]
+for goal_id, goal in enumerate(non_deleted_goals):
         with st.container():
             col_left, col_right = st.columns([3, 1])
             col_left.write(f"#### Goal {goal_id + 1}")
