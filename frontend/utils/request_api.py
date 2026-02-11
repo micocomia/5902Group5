@@ -2,6 +2,109 @@ import json
 import httpx
 import streamlit as st
 from config import backend_endpoint, use_mock_data, use_search
+from datetime import datetime, timezone
+
+
+def _debug_enabled() -> bool:
+    """Front-end toggle (set by sidebar) to surface raw backend responses."""
+    return bool(st.session_state.get("debug_api"))
+
+
+def _coerce_jsonable(value):
+    """
+    Make payload fields JSON-friendly without accidentally stringifying dict/list.
+    - If a string looks like JSON, try json.loads
+    - If it's a Pydantic / dataclass-like object, try to dump to dict
+    """
+    if value is None:
+        return None
+    if isinstance(value, (dict, list, str, int, float, bool)):
+        if isinstance(value, str):
+            s = value.strip()
+            if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+                try:
+                    return json.loads(s)
+                except Exception:
+                    return value
+        return value
+    # Pydantic v2
+    for attr in ("model_dump", "dict"):
+        fn = getattr(value, attr, None)
+        if callable(fn):
+            try:
+                return fn()
+            except Exception:
+                pass
+    return value
+
+
+
+def _store_reasoning_fields(resp_json: dict) -> None:
+    """Persist backend reasoning/trace into session_state if present."""
+    if not isinstance(resp_json, dict):
+        return
+    reasoning = resp_json.get("reasoning")
+    trace = resp_json.get("trace")
+    # Prefer trace if available; otherwise fall back to reasoning
+    if trace is not None:
+        st.session_state["agent_reasoning"] = trace
+    elif reasoning is not None:
+        st.session_state["agent_reasoning"] = reasoning
+
+
+def _normalize_learner_information(learner_information):
+    """Backend expects a STRING for learner_information.
+
+    - If we already have a string, pass through.
+    - If we have a dict/list (from earlier UI steps), stringify as JSON.
+    - If None, send empty string.
+    """
+    if learner_information is None:
+        return ""
+    if isinstance(learner_information, str):
+        return learner_information
+    try:
+        return json.dumps(learner_information, ensure_ascii=False)
+    except Exception:
+        return str(learner_information)
+
+
+def _normalize_skill_gaps(skill_gaps):
+    """Backend expects a *string* for skill_gaps (FastAPI validation: string_type).
+
+    We keep the UI-friendly Python list internally, but when sending to the backend we
+    serialize to JSON text so the backend receives a valid string consistently.
+    """
+    if skill_gaps is None:
+        return "[]"
+
+    # Already a list/dict -> JSON string
+    if isinstance(skill_gaps, (list, dict)):
+        try:
+            return json.dumps(skill_gaps, ensure_ascii=False)
+        except Exception:
+            return "[]"
+
+    # Already a JSON-ish string -> keep as-is (best effort)
+    if isinstance(skill_gaps, str):
+        s = skill_gaps.strip()
+        if not s:
+            return "[]"
+        # If it looks like JSON, keep it; otherwise wrap as a JSON string
+        if (s.startswith("[") and s.endswith("]")) or (s.startswith("{") and s.endswith("}")):
+            return s
+        try:
+            return json.dumps(s, ensure_ascii=False)
+        except Exception:
+            return "[]"
+
+    # Anything else -> stringify then JSON-encode
+    try:
+        return json.dumps(str(skill_gaps), ensure_ascii=False)
+    except Exception:
+        return "[]"
+
+
 
 API_NAMES = {
     "auth_register": "auth/register",
@@ -29,23 +132,62 @@ API_NAMES = {
 }
 
 
+def _set_api_debug_last(url: str, status: int | None, request_json, response_text: str | None) -> None:
+    """Persist the last API call details so pages can render it (prevents 'flash then disappear')."""
+    if not _debug_enabled():
+        return
+    st.session_state["api_debug_last"] = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "url": url,
+        "status": status,
+        "request_json": request_json,
+        "response_text": response_text,
+    }
+
+
 def make_post_request(api_name, data, mock_data_path=None, timeout=500):
-    """Send a POST request to the backend API, or return mock data if enabled."""
+    """Send a POST request to the backend API, or return mock data if enabled.
+
+    When API debug mode is enabled, we store the last request/response in
+    st.session_state["api_debug_last"] so the UI can show it in a sidebar expander.
+    """
     if use_mock_data and mock_data_path:
         return json.load(open(mock_data_path))
 
     backend_url = f"{backend_endpoint}{api_name}"
+
     try:
         response = httpx.post(backend_url, json=data, timeout=timeout)
-        
+
+        # Persist debug info for sidebar display (stable, no flashing)
+        _set_api_debug_last(
+            url=backend_url,
+            status=response.status_code,
+            request_json=data,
+            response_text=response.text,
+        )
+
+        # Optional lightweight inline debug
+        if _debug_enabled():
+            st.caption(f"POST {backend_url}")
+            st.write("HTTP status:", response.status_code)
+
         if response.status_code == 200:
-            return response.json()
-        else:
-            st.write("Failed to fetch data. Status code:", response.status_code)
-            return None
+            resp_json = response.json()
+            _store_reasoning_fields(resp_json)
+            return resp_json
+
+        return None
+
     except Exception as e:
-        st.write("Failed to fetch data. Error:", e)
-        return {}
+        _set_api_debug_last(
+            url=backend_url,
+            status=None,
+            request_json=data,
+            response_text=f"{type(e).__name__}: {e}",
+        )
+        return None
+
 
 def extract_pdf_text(file):
     """Extract text from a PDF file using the backend API."""
@@ -88,30 +230,49 @@ def chat_with_tutor(chat_messages, learner_profile, llm_type="gpt4o", method_nam
 def refine_learning_goal(learning_goal, learner_information, llm_type="gpt4o", method_name="genmentor"):
     data = {
         "learning_goal": str(learning_goal),
-        "learner_information": str(learner_information),
+        "learner_information": _normalize_learner_information(learner_information),
         "llm_type": str(llm_type),
         "method_name": str(method_name),
     }
     response = make_post_request(API_NAMES["refine_goal"], data)
     return response.get("refined_goal") if response else "Refined learning goal"
 
-@st.cache_resource
-def identify_skill_gap(learning_goal, learner_information, llm_type="gpt4o", method_name="genmentor"):
+
+def identify_skill_gap(
+    learning_goal,
+    learner_information,
+    llm_type="gpt4o",
+    method_name="genmentor",
+    user_id=None,
+    goal_id=None,
+):
     data = {
         "learning_goal": str(learning_goal),
-        "learner_information": str(learner_information),
+        "learner_information": _normalize_learner_information(learner_information),
         "llm_type": str(llm_type),
         "method_name": str(method_name),
     }
+    if user_id is not None:
+        data["user_id"] = user_id
+    if goal_id is not None:
+        data["goal_id"] = goal_id
     response = make_post_request(API_NAMES["identify_skill_gap"], data, "./assets/data_example/skill_gap.json")
     return response.get("skill_gaps") if response else None
 
-@st.cache_resource
-def create_learner_profile(learning_goal, learner_information, skill_gaps, llm_type="gpt4o", method_name="genmentor", user_id=None, goal_id=None):
+
+def create_learner_profile(
+    learning_goal,
+    learner_information,
+    skill_gaps,
+    llm_type="gpt4o",
+    method_name="genmentor",
+    user_id=None,
+    goal_id=None,
+):
     data = {
         "learning_goal": str(learning_goal),
-        "learner_information": str(learner_information),
-        "skill_gaps": str(skill_gaps),
+        "learner_information": _normalize_learner_information(learner_information),
+        "skill_gaps": _normalize_skill_gaps(skill_gaps),
         "llm_type": str(llm_type),
         "method_name": str(method_name),
     }
@@ -139,10 +300,16 @@ def update_learner_profile(learner_profile, learner_interactions, learner_inform
     return response.get("learner_profile") if response else None
 
 # @st.cache_resource
-def schedule_learning_path(learner_profile, session_count, llm_type="gpt4o", method_name="genmentor"):
+def schedule_learning_path(learner_profile, session_count=None, llm_type="gpt4o", method_name="genmentor"):
+    # Backend expects learner_profile as an object (dict), not a string.
+    # session_count must be an int.
+    try:
+        session_count_int = int(session_count) if session_count is not None else 5
+    except Exception:
+        session_count_int = 5
     data = {
-        "learner_profile": str(learner_profile),
-        "session_count": session_count,
+        "learner_profile": _coerce_jsonable(learner_profile),
+        "session_count": session_count_int,
         "llm_type": str(llm_type),
         "method_name": str(method_name),
     }
@@ -150,10 +317,15 @@ def schedule_learning_path(learner_profile, session_count, llm_type="gpt4o", met
     return response.get("learning_path") if response else None
 
 def reschedule_learning_path(learning_path, learner_profile, session_count, other_feedback="", llm_type="gpt4o", method_name="genmentor"):
+    # Do not stringify structured objects; backend expects JSON objects.
+    try:
+        session_count_int = int(session_count)
+    except Exception:
+        session_count_int = 5
     data = {
-        "learning_path": str(learning_path),
-        "learner_profile": str(learner_profile),
-        "session_count": int(session_count),
+        "learning_path": _coerce_jsonable(learning_path),
+        "learner_profile": _coerce_jsonable(learner_profile),
+        "session_count": session_count_int,
         "other_feedback": str(other_feedback),
         "llm_type": str(llm_type),
         "method_name": str(method_name),
