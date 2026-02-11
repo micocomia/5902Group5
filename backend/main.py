@@ -1,4 +1,9 @@
 import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 os.environ.setdefault("USER_AGENT", "GenMentor/1.0 (educational-platform)")
 
 import ast
@@ -24,6 +29,7 @@ from api_schemas import *
 from config import load_config
 from utils import store
 from utils import auth_store, auth_jwt
+
 
 app_config = load_config(config_name="main")
 search_rag_manager = SearchRagManager.from_config(app_config)

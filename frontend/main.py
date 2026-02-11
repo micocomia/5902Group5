@@ -5,6 +5,63 @@ from components.topbar import logout
 initialize_session_state()
 
 
+# --- Reasoning UI helpers (safe, optional) ---
+def _extract_reasoning_payload():
+    """Find reasoning/trace data in session_state, regardless of how pages store it."""
+    # Direct keys
+    direct_keys = [
+        "agent_reasoning",
+        "reasoning",
+        "trace",
+        "agent_trace",
+        "latest_response",
+        "last_response",
+        "last_agent_response",
+    ]
+    for k in direct_keys:
+        v = st.session_state.get(k, None)
+        if v:
+            # If it's a full API response dict, try to pick a reasoning-like field inside it.
+            if isinstance(v, dict):
+                for kk in ("reasoning", "rationale", "explanation", "trace", "agent_reasoning", "agent_trace"):
+                    if v.get(kk):
+                        return f"{k}.{kk}", v.get(kk)
+            return k, v
+
+    # Nested candidates inside a response dict stored under common keys
+    for response_key in ("latest_response", "last_response", "last_agent_response"):
+        resp = st.session_state.get(response_key)
+        if isinstance(resp, dict):
+            for kk in ("reasoning", "rationale", "explanation", "trace", "agent_reasoning", "agent_trace"):
+                if resp.get(kk):
+                    return f"{response_key}.{kk}", resp.get(kk)
+
+    return None, None
+
+
+def render_reasoning_panel(container):
+    """Render a toggle + expander that shows agent reasoning when available."""
+    st.session_state.setdefault("show_agent_reasoning", False)
+    container.checkbox("Show agent reasoning", key="show_agent_reasoning")
+
+    if st.session_state.get("show_agent_reasoning"):
+        source, payload = _extract_reasoning_payload()
+        with container.expander("Agent reasoning", expanded=True):
+            if payload is None:
+                container.info(
+                    "No reasoning available yet. "
+                    "This will appear once the backend returns a 'reasoning' or 'trace' field "
+                    "and the page stores it in session_state."
+                )
+            else:
+                container.caption(f"Source: {source}")
+                if isinstance(payload, (dict, list)):
+                    container.json(payload)
+                else:
+                    container.write(payload)
+# --- End reasoning UI helpers ---
+
+
 st.session_state.setdefault("_autosave_enabled", True)
 try:
     save_persistent_state()
@@ -63,54 +120,107 @@ else:
         if st.button("Logout", icon=":material/exit_to_app:"):
             logout()
             st.rerun()
-    goal = st.session_state["goals"][st.session_state["selected_goal_id"]]
-    goal['start_time'] = time.time()
+
+st.divider()
+# Optional: display agent reasoning/trace for ethics/transparency demos
+render_reasoning_panel(st.sidebar)
+
+# ---- Learning analytics (defensive) ----
+# The app may reach this page before goals are loaded/created. Avoid crashes.
+st.session_state.setdefault("learned_skills_history", {})
+
+goals = st.session_state.get("goals") or []
+selected = st.session_state.get("selected_goal_id", 0)
+
+goal = None
+# If selected is a list index
+if isinstance(selected, int) and 0 <= selected < len(goals):
+    goal = goals[selected]
+# If selected is an id and goals are dicts with "id"
+elif goals:
+    for g in goals:
+        try:
+            if isinstance(g, dict) and g.get("id") == selected:
+                goal = g
+                break
+        except Exception:
+            pass
+    # Fallback: pick first goal to keep app functional
+    if goal is None:
+        goal = goals[0]
+        st.session_state["selected_goal_id"] = 0
+
+if goal is not None:
+    goal["start_time"] = time.time()
     try:
         save_persistent_state()
     except Exception:
         pass
-    unlearned_skill = len(goal['learner_profile']['cognitive_status']['in_progress_skills'])
-    learned_skill = len(goal['learner_profile']['cognitive_status']['mastered_skills'])
-    all_skill = learned_skill + unlearned_skill
 
-    if goal['id'] not in st.session_state['learned_skills_history']:
-        st.session_state['learned_skills_history'][goal['id']] = []
-        try:
-            save_persistent_state()
-        except Exception:
-            pass
+    # Compute mastery rate defensively
+    mastery_rate = 0
+    try:
+        unlearned_skill = len(goal["learner_profile"]["cognitive_status"]["in_progress_skills"])
+        learned_skill = len(goal["learner_profile"]["cognitive_status"]["mastered_skills"])
+        all_skill = learned_skill + unlearned_skill
+        mastery_rate = (learned_skill / all_skill) if all_skill else 0
+    except Exception:
+        # If profile keys are missing, skip analytics quietly
+        all_skill = 0
 
-    if all_skill != 0:
-        mastery_rate = learned_skill / all_skill if all_skill != 0 else 0
-        if st.session_state['learned_skills_history'][goal['id']] == []:
-            st.session_state['learned_skills_history'][goal['id']].append(mastery_rate)
+    # Track mastery history per-goal id if available
+    goal_id = None
+    try:
+        goal_id = goal.get("id") if isinstance(goal, dict) else None
+    except Exception:
+        goal_id = None
+
+    if goal_id is not None:
+        if goal_id not in st.session_state["learned_skills_history"]:
+            st.session_state["learned_skills_history"][goal_id] = []
             try:
                 save_persistent_state()
             except Exception:
                 pass
-    if(time.time()-goal['start_time']>600):
-        goal['start_time'] = time.time()
+
+        # First sample
+        if all_skill:
+            if st.session_state["learned_skills_history"][goal_id] == []:
+                st.session_state["learned_skills_history"][goal_id].append(mastery_rate)
+                try:
+                    save_persistent_state()
+                except Exception:
+                    pass
+
+        # Periodic sample every 10 minutes
         try:
-            save_persistent_state()
-        except Exception:
-            pass
-        st.session_state['learned_skills_history'][goal['id']].append(mastery_rate)
-        try:
-            save_persistent_state()
+            if (time.time() - goal["start_time"]) > 600:
+                goal["start_time"] = time.time()
+                try:
+                    save_persistent_state()
+                except Exception:
+                    pass
+                st.session_state["learned_skills_history"][goal_id].append(mastery_rate)
+                try:
+                    save_persistent_state()
+                except Exception:
+                    pass
         except Exception:
             pass
 
-    if len(st.session_state['learned_skills_history'][goal['id']]) > 10:
-        st.session_state['learned_skills_history'][goal['id']].pop(0)
-        try:
-            save_persistent_state()
-        except Exception:
-            pass
+        # Keep last 10 points
+        if len(st.session_state["learned_skills_history"][goal_id]) > 10:
+            st.session_state["learned_skills_history"][goal_id].pop(0)
+            try:
+                save_persistent_state()
+            except Exception:
+                pass
 
     try:
         save_persistent_state()
     except Exception:
         pass
+# ---- End learning analytics ----
 
 try:
     if st.session_state.get("_autosave_enabled", True):

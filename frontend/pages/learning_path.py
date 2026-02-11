@@ -12,6 +12,47 @@ from utils.request_api import (
 from components.navigation import render_navigation
 from utils.state import save_persistent_state
 
+
+def _store_agent_reasoning(result, context: str = ""):
+    """Store any agent reasoning/trace returned by backend into Streamlit session_state.
+
+    This enables the main sidebar 'Agent reasoning' panel (or any page) to display it.
+    Safe for string/dict/list responses.
+    """
+    if result is None:
+        return
+
+    payload = None
+    raw = None
+
+    if isinstance(result, dict):
+        raw = result
+        # Common keys teams use
+        for k in ("reasoning", "rationale", "explanation", "agent_reasoning"):
+            v = result.get(k)
+            if v:
+                payload = v
+                break
+
+        # Fallback: trace-like structures
+        if payload is None:
+            for k in ("trace", "traces", "debug_trace", "steps", "chain", "log"):
+                v = result.get(k)
+                if v:
+                    payload = v
+                    break
+
+    # If backend returns list/string directly
+    elif isinstance(result, (list, str)):
+        payload = result
+
+    if payload is not None:
+        st.session_state["agent_reasoning"] = payload
+        if context:
+            st.session_state["agent_reasoning_context"] = context
+        if raw is not None:
+            st.session_state["agent_reasoning_raw_response"] = raw
+
 def render_learning_path():
     if not st.session_state.get("if_complete_onboarding"):
         st.switch_page("pages/onboarding.py")
@@ -38,11 +79,12 @@ def render_learning_path():
     """, unsafe_allow_html=True)
     if not goal["learning_path"]:
         with st.spinner('Scheduling Learning Path ...'):
-            goal["learning_path"] = schedule_learning_path(goal["learner_profile"], session_count=8)
+            result = schedule_learning_path(goal["learner_profile"], session_count=8)
+            _store_agent_reasoning(result, "schedule_learning_path")
+            goal["learning_path"] = result.get("learning_path", result) if isinstance(result, dict) else result
             save_persistent_state()
             st.toast("🎉 Successfully schedule learning path!")
             st.rerun()
-        my_bar.empty()
     else:
         render_overall_information(goal)
         render_path_feedback_section(goal)
@@ -103,6 +145,7 @@ def render_path_feedback_section(goal):
                         goal["learning_path"],
                         max_iterations=iteration_count
                     )
+                    _store_agent_reasoning(result, 'iterative_refine_learning_path')
                     if result and result.get("final_learning_path"):
                         goal["learning_path"] = result["final_learning_path"]
                         # Clear feedback cache after refinement
@@ -126,6 +169,7 @@ def render_path_feedback_section(goal):
         if st.session_state.get("if_simulating_feedback"):
             with st.spinner('Simulating learner feedback...'):
                 feedback = simulate_path_feedback(goal["learner_profile"], goal["learning_path"])
+                _store_agent_reasoning(feedback, 'simulate_path_feedback')
                 if feedback:
                     if "path_feedback_cache" not in st.session_state:
                         st.session_state["path_feedback_cache"] = {}
@@ -144,6 +188,7 @@ def render_path_feedback_section(goal):
             if cached_feedback:
                 with st.spinner('Refining learning path...'):
                     refined_path = refine_learning_path_with_feedback(goal["learning_path"], cached_feedback)
+                    _store_agent_reasoning(refined_path, 'refine_learning_path_with_feedback')
                     if refined_path:
                         goal["learning_path"] = refined_path.get("learning_path", refined_path)
                         # Clear feedback cache after refinement
@@ -211,7 +256,9 @@ def render_learning_sessions(goal):
             st.rerun()
         if st.session_state.get("if_rescheduling_learning_path"):
             with st.spinner('Re-scheduling Learning Path ...'):
-                goal["learning_path"] = reschedule_learning_path(goal["learning_path"], goal["learner_profile"], expected_session_count)
+                result = reschedule_learning_path(goal["learning_path"], goal["learner_profile"], expected_session_count)
+                _store_agent_reasoning(result, 'reschedule_learning_path')
+                goal["learning_path"] = result.get('learning_path', result) if isinstance(result, dict) else result
                 st.session_state["if_rescheduling_learning_path"] = False
                 try:
                     save_persistent_state()

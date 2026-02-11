@@ -66,14 +66,32 @@ def login():
 
 
 def logout():
+    # Be defensive: keys may not exist depending on navigation order / reruns
     st.session_state["logged_in"] = False
     st.session_state["userId"] = "default"
     st.session_state["if_complete_onboarding"] = False
     st.session_state["goals"] = []
     st.session_state["_navigated_lp_once"] = False
 
+    # Optional keys that may exist in some flows
+    for k in [
+        "selected_goal_id",
+        "selected_model",
+        "agent_reasoning",
+        "agent_reasoning_context",
+        "agent_reasoning_raw_response",
+    ]:
+        st.session_state.pop(k, None)
+
 
 def render_topbar():
+
+    # Ensure expected session keys exist (prevents KeyError on first load / direct page nav)
+    st.session_state.setdefault("logged_in", False)
+    st.session_state.setdefault("userId", "default")
+    st.session_state.setdefault("if_complete_onboarding", False)
+    st.session_state.setdefault("goals", [])
+    st.session_state.setdefault("_navigated_lp_once", False)
     col1, col3, col4 = st.columns([1, 8, 1])
     # first-time backend availability check
     if "checked_backend" not in st.session_state:
@@ -100,7 +118,7 @@ def render_topbar():
             settings()
 
     with col4:
-        if st.session_state["logged_in"]:
+        if st.session_state.get("logged_in", False):
             with st.popover("", icon=":material/account_circle:", use_container_width=True):
                 st.caption(f"Signed in as **{st.session_state.get('userId', '')}**")
                 logout_button = st.button("Log-out", icon=":material/exit_to_app:")
