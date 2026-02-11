@@ -13,16 +13,12 @@ frontend/assets/validation_dataset
 frontend/.env
 backend/.env
 backend/data/
+.env
 
 pids/
 .DS_Store
 frontend/config.py
 data/vectorstore/chroma.sqlite3
-<<<<<<< HEAD
+
 /backend/notes
 /backend/implementation_plan
-=======
-
-.env
-backend/.env
->>>>>>> 85c4480 (Fix frontend API payloads + debug panel; skill gap and profile flow improvements)
