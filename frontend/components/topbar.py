@@ -20,6 +20,7 @@ def login():
                 status, data = auth_login(login_user, login_pass)
                 if status == 200:
                     st.session_state["userId"] = data["username"]
+                    st.session_state["auth_token"] = data.get("token", "")
                     load_persistent_state()
                     st.session_state["logged_in"] = True
                     try:
@@ -52,6 +53,7 @@ def login():
                 if status == 200:
                     st.session_state["logged_in"] = True
                     st.session_state["userId"] = data["username"]
+                    st.session_state["auth_token"] = data.get("token", "")
                     try:
                         save_persistent_state()
                     except Exception:

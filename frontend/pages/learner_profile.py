@@ -1,6 +1,6 @@
 import math
 import streamlit as st
-from utils.request_api import create_learner_profile, update_learner_profile
+from utils.request_api import create_learner_profile, update_learner_profile, auth_delete_user
 from components.skill_info import render_skill_info
 from components.navigation import render_navigation
 from utils.pdf import extract_text_from_pdf
@@ -191,32 +191,35 @@ def render_additional_info_form(goal):
     with st.form(key="additional_info_form"):
         st.markdown("#### Value Your Feedback")
         st.info("Help us improve your learning experience by providing your feedback below.")
-        st.write("How much do you agree with the current profile?")
+        st.write("How much do you agree with the current profile? *")
         agreement_star = st.feedback("stars", key="agreement_star")
-        st.write("Do you have any suggestions or corrections?")
+        st.write("Do you have any suggestions or corrections? *")
         suggestions = st.text_area("Provide your suggestions here.", label_visibility="collapsed")
-        st.write("Do you have any additional information to add?")
-        additional_info = st.text_area("Provide any additional information or feedback here.", label_visibility="collapsed")
         pdf_file = st.file_uploader("Upload a PDF with additional information (e.g., resume)", type="pdf")
         if pdf_file is not None:
             with st.spinner("Extracting text from PDF..."):
                 additional_info_pdf = extract_text_from_pdf(pdf_file)
-                st.toast("✅ PDF uploaded successfully.")
+                st.toast("PDF uploaded successfully.")
         else:
             additional_info_pdf = ""
-        st.session_state["additional_info"] = {
-            "agreement_star": agreement_star,
-            "suggestions": suggestions,
-            "additional_info": additional_info + additional_info_pdf
-        }
-        try:
-            save_persistent_state()
-        except Exception:
-            pass
-        submit_button = st.form_submit_button("Update Profile", on_click=update_learner_profile_with_additional_info, 
-                                              kwargs={"goal": goal, "additional_info": additional_info, }, type="primary")
-        
-def update_learner_profile_with_additional_info(goal, additional_info):
+        submit_button = st.form_submit_button("Update Profile", type="primary")
+        if submit_button:
+            if agreement_star is None or not suggestions.strip():
+                st.error("Please provide both a star rating and suggestions before submitting.")
+                return
+            st.session_state["additional_info"] = {
+                "agreement_star": agreement_star,
+                "suggestions": suggestions,
+                "additional_info": additional_info_pdf,
+            }
+            try:
+                save_persistent_state()
+            except Exception:
+                pass
+            with st.spinner("Updating your profile..."):
+                update_learner_profile_with_additional_info(goal)
+
+def update_learner_profile_with_additional_info(goal):
     additional_info = st.session_state["additional_info"]
     new_learner_profile = update_learner_profile(goal["learner_profile"], additional_info, user_id=st.session_state.get("userId"), goal_id=st.session_state.get("selected_goal_id"))
     if new_learner_profile is not None:
@@ -225,9 +228,10 @@ def update_learner_profile_with_additional_info(goal, additional_info):
             save_persistent_state()
         except Exception:
             pass
-        st.toast("🎉 Successfully updated your profile!")
+        st.toast("Successfully updated your profile!")
+        st.rerun()
     else:
-        st.toast("❌ Failed to update your profile. Please try again.")
+        st.error("Failed to update your profile. Please try again.")
 
 
 @st.dialog("Confirm Restart Onboarding")
@@ -268,8 +272,60 @@ def show_restart_onboarding_dialog():
                 pass
 
 
+@st.dialog("Confirm Delete Account")
+def show_delete_account_dialog():
+    st.error("This action is permanent. Your account and all associated data will be deleted and cannot be recovered.")
+    st.divider()
+    col_confirm, _space, col_cancel = st.columns([1, 2, 0.7])
+    with col_confirm:
+        if st.button("Delete", type="primary"):
+            token = st.session_state.get("auth_token", "")
+            if not token:
+                st.error("No auth token found. Please log out and log back in, then try again.")
+                return
+            status, resp = auth_delete_user(token)
+            if status == 200:
+                try:
+                    st.session_state.clear()
+                except Exception:
+                    pass
+                st.session_state["logged_in"] = False
+                st.session_state["userId"] = "default"
+                st.success("Account deleted successfully.")
+                try:
+                    st.switch_page("main.py")
+                except Exception:
+                    st.rerun()
+            else:
+                detail = resp.get("detail", "Unknown error") if isinstance(resp, dict) else str(resp)
+                st.error(f"Failed to delete account: {detail}")
+    with col_cancel:
+        if st.button("Cancel"):
+            try:
+                st.rerun()
+            except Exception:
+                pass
+
+
 render_learner_profile()
 
 st.divider()
-if st.button("Restart Onboarding", icon=":material/restart_alt:", help="Clear all progress and start onboarding from scratch (keeps a backup)"):
-    show_restart_onboarding_dialog()
+col_restart, col_delete = st.columns(2)
+with col_restart:
+    if st.button("Restart Onboarding", icon=":material/restart_alt:", help="Clear all progress and start onboarding from scratch (keeps a backup)"):
+        show_restart_onboarding_dialog()
+with col_delete:
+    st.markdown("""
+        <style>
+        div[data-testid="stColumn"]:last-child button[kind="primary"] {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        div[data-testid="stColumn"]:last-child button[kind="primary"]:hover {
+            background-color: #bb2d3b;
+            border-color: #b02a37;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    if st.button("Delete Account", icon=":material/delete_forever:", type="primary", help="Permanently delete your account and all associated data"):
+        show_delete_account_dialog()

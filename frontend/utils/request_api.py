@@ -301,14 +301,14 @@ def update_learner_profile(learner_profile, learner_interactions, learner_inform
 
 # @st.cache_resource
 def schedule_learning_path(learner_profile, session_count=None, llm_type="gpt4o", method_name="genmentor"):
-    # Backend expects learner_profile as an object (dict), not a string.
+    # Backend expects learner_profile as a string.
     # session_count must be an int.
     try:
         session_count_int = int(session_count) if session_count is not None else 5
     except Exception:
         session_count_int = 5
     data = {
-        "learner_profile": _coerce_jsonable(learner_profile),
+        "learner_profile": str(learner_profile),
         "session_count": session_count_int,
         "llm_type": str(llm_type),
         "method_name": str(method_name),
@@ -317,14 +317,14 @@ def schedule_learning_path(learner_profile, session_count=None, llm_type="gpt4o"
     return response.get("learning_path") if response else None
 
 def reschedule_learning_path(learning_path, learner_profile, session_count, other_feedback="", llm_type="gpt4o", method_name="genmentor"):
-    # Do not stringify structured objects; backend expects JSON objects.
+    # Backend expects learner_profile and learning_path as strings.
     try:
         session_count_int = int(session_count)
     except Exception:
         session_count_int = 5
     data = {
-        "learning_path": _coerce_jsonable(learning_path),
-        "learner_profile": _coerce_jsonable(learner_profile),
+        "learning_path": str(learning_path),
+        "learner_profile": str(learner_profile),
         "session_count": session_count_int,
         "other_feedback": str(other_feedback),
         "llm_type": str(llm_type),
@@ -501,5 +501,18 @@ def auth_login(username, password):
     try:
         response = httpx.post(backend_url, json=data, timeout=30)
         return response.status_code, response.json()
+    except Exception as e:
+        return None, {"detail": str(e)}
+
+
+def auth_delete_user(token):
+    """Delete the authenticated user's account via DELETE /auth/user."""
+    if use_mock_data:
+        return 200, {"ok": True}
+    url = f"{backend_endpoint}auth/user"
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = httpx.delete(url, headers=headers, timeout=30)
+        return resp.status_code, resp.json()
     except Exception as e:
         return None, {"detail": str(e)}
