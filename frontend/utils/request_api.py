@@ -301,7 +301,7 @@ def update_learner_profile(learner_profile, learner_interactions, learner_inform
 
 # @st.cache_resource
 def schedule_learning_path(learner_profile, session_count=None, llm_type="gpt4o", method_name="genmentor"):
-    # Backend expects learner_profile as an object (dict), not a string.
+    # Backend expects learner_profile as a string.
     # session_count must be an int.
     try:
         session_count_int = int(session_count) if session_count is not None else 5
@@ -309,7 +309,7 @@ def schedule_learning_path(learner_profile, session_count=None, llm_type="gpt4o"
         session_count_int = 5
 
     data = {
-        "learner_profile": _coerce_jsonable(learner_profile),
+        "learner_profile": str(learner_profile),
         "session_count": session_count_int,
     }
 

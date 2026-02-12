@@ -97,9 +97,8 @@ mypy_extensions==1.1.0
 networkx==3.6.1
 numpy==2.4.2
 oauthlib==3.3.1
-ocrmac==1.0.1
 omegaconf==2.3.0
-onnxruntime==1.23.2
+onnxruntime==1.24.1
 openai==2.16.0
 opencv-python==4.13.0.90
 openpyxl==3.1.5
@@ -133,11 +132,6 @@ pydantic_core==2.41.5
 Pygments==2.19.2
 PyJWT==2.11.0
 pylatexenc==2.10
-pyobjc-core==12.1
-pyobjc-framework-Cocoa==12.1
-pyobjc-framework-CoreML==12.1
-pyobjc-framework-Quartz==12.1
-pyobjc-framework-Vision==12.1
 pypdf==6.6.2
 PyPDF2==3.0.1
 pypdfium2==5.3.0
@@ -198,7 +192,6 @@ tzdata==2025.3
 urllib3==2.6.3
 uuid_utils==0.14.0
 uvicorn==0.40.0
-uvloop==0.22.1
 watchfiles==1.1.1
 websocket-client==1.9.0
 websockets==16.0
