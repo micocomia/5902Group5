@@ -261,6 +261,107 @@ def get_llm(model_provider: str | None = None, model_name: str | None = None, **
     model_name = model_name or app_config.llm.model_name
     return LLMFactory.create(model=model_name, model_provider=model_provider, **kwargs)
 
+PERSONAS = {
+    "Hands-on Explorer": {
+        "description": "Prefers active experimentation, concrete examples, visual aids, and step-by-step guidance.",
+        "fslsm_dimensions": {
+            "fslsm_processing": -0.7,
+            "fslsm_perception": -0.5,
+            "fslsm_input": -0.5,
+            "fslsm_understanding": -0.5,
+        },
+    },
+    "Reflective Reader": {
+        "description": "Prefers observation-based learning, abstract concepts, text-heavy materials, and big-picture overviews.",
+        "fslsm_dimensions": {
+            "fslsm_processing": 0.7,
+            "fslsm_perception": 0.5,
+            "fslsm_input": 0.7,
+            "fslsm_understanding": 0.5,
+        },
+    },
+    "Visual Learner": {
+        "description": "Strongly prefers diagrams, videos, and visual aids with a slight preference for hands-on activities.",
+        "fslsm_dimensions": {
+            "fslsm_processing": -0.2,
+            "fslsm_perception": -0.3,
+            "fslsm_input": -0.8,
+            "fslsm_understanding": -0.3,
+        },
+    },
+    "Conceptual Thinker": {
+        "description": "Prefers abstract theories, reflective analysis, and big-picture understanding.",
+        "fslsm_dimensions": {
+            "fslsm_processing": 0.5,
+            "fslsm_perception": 0.7,
+            "fslsm_input": 0.0,
+            "fslsm_understanding": 0.7,
+        },
+    },
+    "Balanced Learner": {
+        "description": "No strong preference — adapts to any learning style. A neutral starting point.",
+        "fslsm_dimensions": {
+            "fslsm_processing": 0.0,
+            "fslsm_perception": 0.0,
+            "fslsm_input": 0.0,
+            "fslsm_understanding": 0.0,
+        },
+    },
+}
+
+
+@app.get("/personas")
+async def get_personas():
+    """Return all available learning personas with their FSLSM dimensions."""
+    return {"personas": PERSONAS}
+
+
+APP_CONFIG = {
+    "skill_levels": ["unlearned", "beginner", "intermediate", "advanced"],
+    "default_session_count": 8,
+    "default_llm_type": "gpt4o",
+    "default_method_name": "genmentor",
+    "motivational_trigger_interval_secs": 180,
+    "max_refinement_iterations": 5,
+    "fslsm_thresholds": {
+        "perception": {
+            "low_threshold": -0.3,
+            "high_threshold": 0.3,
+            "low_label": "Concrete examples and practical applications",
+            "high_label": "Conceptual and theoretical explanations",
+            "neutral_label": "A mix of practical and conceptual content",
+        },
+        "understanding": {
+            "low_threshold": -0.3,
+            "high_threshold": 0.3,
+            "low_label": "presented in step-by-step sequences",
+            "high_label": "with big-picture overviews first",
+            "neutral_label": "balancing sequential detail and big-picture context",
+        },
+        "processing": {
+            "low_threshold": -0.3,
+            "high_threshold": 0.3,
+            "low_label": "Hands-on and interactive activities",
+            "high_label": "Reading and observation-based learning",
+            "neutral_label": "A balance of interactive and reflective activities",
+        },
+        "input": {
+            "low_threshold": -0.3,
+            "high_threshold": 0.3,
+            "low_label": "with diagrams, charts, and videos",
+            "high_label": "with text-based materials and lectures",
+            "neutral_label": "using both visual and verbal materials",
+        },
+    },
+}
+
+
+@app.get("/config")
+async def get_app_config():
+    """Return application configuration for frontend consumption."""
+    return APP_CONFIG
+
+
 @app.post("/extract-pdf-text")
 async def extract_pdf_text(file: UploadFile = File(...)):
     """Extract text from an uploaded PDF file."""

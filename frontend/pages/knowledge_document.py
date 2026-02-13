@@ -7,7 +7,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import urllib.parse as urlparse
 from components.time_tracking import track_session_learning_start_time
-from utils.request_api import draft_knowledge_points, explore_knowledge_points, generate_document_quizzes, integrate_learning_document, update_learner_profile
+from utils.request_api import draft_knowledge_points, explore_knowledge_points, generate_document_quizzes, integrate_learning_document, update_learner_profile, get_app_config
 from utils.format import prepare_markdown_document
 from utils.state import get_current_session_uid, save_persistent_state
 from config import use_mock_data, use_search
@@ -86,7 +86,7 @@ def render_motivataional_triggers():
     session_learning_times = st.session_state["session_learning_times"][session_uid]
     last_session_trigger_time = session_learning_times["trigger_time_list"][-1]
     last_session_trigger_time_index = len(session_learning_times["trigger_time_list"])
-    trigger_interval = 60 * 3
+    trigger_interval = get_app_config()["motivational_trigger_interval_secs"]
     if curr_time - last_session_trigger_time > trigger_interval:
         if last_session_trigger_time_index % 2 == 0:
             st.toast("🌟 Stay hydrated and keep a healthy posture.")

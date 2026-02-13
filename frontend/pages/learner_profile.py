@@ -1,6 +1,6 @@
 import math
 import streamlit as st
-from utils.request_api import create_learner_profile, update_learner_profile, auth_delete_user
+from utils.request_api import create_learner_profile, update_learner_profile, auth_delete_user, get_app_config
 from components.skill_info import render_skill_info
 from components.navigation import render_navigation
 from utils.pdf import extract_text_from_pdf
@@ -140,33 +140,20 @@ def render_learning_preferences(goal):
         with col3:
             st.markdown(f"**{right_label}**")
 
-    if perception <= -0.3:
-        cs_part1 = "Concrete examples and practical applications"
-    elif perception >= 0.3:
-        cs_part1 = "Conceptual and theoretical explanations"
-    else:
-        cs_part1 = "A mix of practical and conceptual content"
-    if understanding <= -0.3:
-        cs_part2 = "presented in step-by-step sequences"
-    elif understanding >= 0.3:
-        cs_part2 = "with big-picture overviews first"
-    else:
-        cs_part2 = "balancing sequential detail and big-picture context"
-    content_style = f"{cs_part1}, {cs_part2}"
+    fslsm_cfg = get_app_config()["fslsm_thresholds"]
+    dim_values = {"perception": perception, "understanding": understanding, "processing": processing, "input": inp}
 
-    if processing <= -0.3:
-        at_part1 = "Hands-on and interactive activities"
-    elif processing >= 0.3:
-        at_part1 = "Reading and observation-based learning"
-    else:
-        at_part1 = "A balance of interactive and reflective activities"
-    if inp <= -0.3:
-        at_part2 = "with diagrams, charts, and videos"
-    elif inp >= 0.3:
-        at_part2 = "with text-based materials and lectures"
-    else:
-        at_part2 = "using both visual and verbal materials"
-    activity_type = f"{at_part1}, {at_part2}"
+    def _describe(dim_name, value):
+        t = fslsm_cfg[dim_name]
+        if value <= t["low_threshold"]:
+            return t["low_label"]
+        elif value >= t["high_threshold"]:
+            return t["high_label"]
+        else:
+            return t["neutral_label"]
+
+    content_style = f"{_describe('perception', perception)}, {_describe('understanding', understanding)}"
+    activity_type = f"{_describe('processing', processing)}, {_describe('input', inp)}"
 
     st.write(f"**Content Style:** {content_style}")
     st.write(f"**Preferred Activity Type:** {activity_type}")

@@ -101,15 +101,16 @@ python -m pytest backend/tests/test_user_state.py -v
 
 ### Streamlit Frontend Test Steps
 
+> **Note:** As of the single-page onboarding redesign, persona selection, resume upload, goal setting, and AI refinement all appear on one page. There are no Next/Previous card navigation buttons.
+
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Log in (or register). Ensure onboarding is not yet completed. | Onboarding page loads, "Share Your Information" card is visible |
-| 2 | Observe the **"Select your learning persona"** dropdown | Dropdown lists 5 personas: "Hands-on Explorer", "Reflective Reader", "Visual Learner", "Conceptual Thinker", "Balanced Learner" — each with a description |
-| 3 | Select **"Hands-on Explorer"** | Dropdown updates to show the selection. Session state `learner_persona` is set to "Hands-on Explorer" |
-| 4 | Change selection to **"Reflective Reader"** | Dropdown updates. The `learner_information` string should now contain "Learning Persona: Reflective Reader (initial FSLSM: processing=0.7, perception=0.5, input=0.7, understanding=0.5)" |
-| 5 | Click **Next** to go to the Goal card, then click **Previous** to come back | Persona selection should be preserved (still shows "Reflective Reader") |
-| 6 | Log out, then log back in | Persona selection should be restored from backend persistence |
-| 7 | Attempt to click **Save & Continue** on the goal page without selecting a persona | Warning: "Please provide both a learning goal and select a learning persona before continuing." |
+| 1 | Log in (or register). Ensure onboarding is not yet completed. | Onboarding page loads showing the full single-page layout: welcome header, goal input, persona cards, resume upload, LinkedIn placeholder, and "Begin Learning" button |
+| 2 | Observe the **persona selection cards** | Five cards are displayed in a row: "Hands-on Explorer", "Reflective Reader", "Visual Learner", "Conceptual Thinker", "Balanced Learner" — each with a description and a "Select" button |
+| 3 | Click **"Select"** under **"Hands-on Explorer"** | Card highlights (blue border). Button changes to "✓ Selected". Session state `learner_persona` is set to "Hands-on Explorer" |
+| 4 | Click **"Select"** under **"Reflective Reader"** | "Reflective Reader" card highlights, "Hands-on Explorer" is deselected. The `learner_information` string should now contain "Learning Persona: Reflective Reader (initial FSLSM: processing=0.7, perception=0.5, input=0.7, understanding=0.5)" |
+| 5 | Log out, then log back in | Persona selection should be restored from backend persistence |
+| 6 | Click **"Begin Learning"** without selecting a persona | Warning: "Please provide both a learning goal and select a learning persona before continuing." |
 
 ---
 
@@ -137,13 +138,14 @@ python -m pytest backend/tests/test_onboarding_api.py::TestExtractPdfText backen
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Navigate to Onboarding → "Share Your Information" card | PDF upload area is visible: "[Optional] Upload a PDF with your information (e.g., resume)" |
+| 1 | On the Onboarding page, observe the bottom section | Two action cards are visible: "Upload Your Resume (Optional)" on the left, "Connect to your LinkedIn" on the right |
 | 2 | Click the upload area and select a valid PDF file (e.g., a resume) | Spinner appears: "Extracting text from PDF...". After a moment, toast message: "PDF uploaded successfully." |
-| 3 | Observe the `learner_information` value (visible in debug sidebar or by checking state) | The extracted PDF text is appended to the `learner_information` string after the persona prefix and any manual text |
+| 3 | Observe the `learner_information` value (visible in debug sidebar or by checking state) | The extracted PDF text is appended to the `learner_information` string after the persona prefix |
 | 4 | Try uploading a non-PDF file (e.g., a .docx or .txt) | File uploader rejects it — only `.pdf` files accepted |
 | 5 | Upload a multi-page PDF | All pages' text should be extracted and included |
-| 6 | Continue through onboarding to the skill gap step | The `learner_information` passed to `POST /identify-skill-gap-with-info` should include the resume text, which means the AI should reference your background when identifying skill gaps |
-| 7 | Do NOT upload a PDF (leave it empty), proceed through onboarding | Flow should work normally — PDF is optional. `learner_information_pdf` should be empty string |
+| 6 | Click **"Begin Learning"** (with goal and persona filled) | App navigates to the Skill Gap page. The `learner_information` passed to `POST /identify-skill-gap-with-info` should include the resume text |
+| 7 | Do NOT upload a PDF (leave it empty), click **"Begin Learning"** | Flow should work normally — PDF is optional. `learner_information_pdf` should be empty string |
+| 8 | Click **"Connect LinkedIn"** button | Toast message: "LinkedIn integration coming soon!" (placeholder functionality) |
 
 ---
 
@@ -174,12 +176,11 @@ python -m pytest backend/tests/test_user_state.py backend/tests/test_onboarding_
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | On the Onboarding page, complete "Share Your Information" card and click **Next** | "Set Learning Goal" card appears with a text area and AI Refinement button |
-| 2 | Leave the goal text area empty and click **Save & Continue** | Warning: "Please provide both a learning goal and select a learning persona before continuing." |
-| 3 | Enter a learning goal (e.g., "I want to become an HR Manager with expertise in HRIS systems") | Text area updates, goal is stored in `to_add_goal["learning_goal"]` |
-| 4 | Click **Save & Continue** (with persona already selected) | App navigates to the Skill Gap page. The goal text is used for skill gap identification |
-| 5 | Click **Previous** before saving | Returns to "Share Your Information" card. Goal text should be preserved |
-| 6 | Log out and log back in (after entering a goal but before saving) | Goal text should be restored from persisted state |
+| 1 | On the Onboarding page, observe the "What would you like to learn today?" section | A text input is visible with placeholder "eg : learn english, python, data ....." |
+| 2 | Leave the goal input empty and click **"Begin Learning"** | Warning: "Please provide both a learning goal and select a learning persona before continuing." |
+| 3 | Enter a learning goal (e.g., "I want to become an HR Manager with expertise in HRIS systems") | Input field updates, goal is stored in `to_add_goal["learning_goal"]` |
+| 4 | Select a persona and click **"Begin Learning"** | App navigates to the Skill Gap page. The goal text is used for skill gap identification |
+| 5 | Log out and log back in (after entering a goal but before clicking Begin Learning) | Goal text should be restored from persisted state |
 
 ---
 
@@ -206,12 +207,12 @@ python -m pytest backend/tests/test_onboarding_api.py::TestRefineGoalEndpoint -v
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Navigate to Onboarding → "Set Learning Goal" card | Goal text area and **"✨ AI Refinement"** button are visible |
-| 2 | Enter a vague goal (e.g., "learn about HR stuff") | Text area shows the goal |
-| 3 | Click **"✨ AI Refinement"** | Button becomes disabled. Hint text appears: "✨ Refining learning goal...". After a few seconds, the goal text area updates with a refined, more specific version (e.g., "Develop comprehensive HR management competencies including talent acquisition, employee relations, compensation and benefits administration, and HRIS systems management") |
-| 4 | Observe the refined goal | Toast: "Refined Learning goal successfully." Goal text area now contains the AI-refined version |
+| 1 | On the Onboarding page, observe the area below the learning goal input | The **"✨ AI Refinement"** button is visible to the right of the hint text |
+| 2 | Enter a vague goal (e.g., "learn about HR stuff") | Input field shows the goal |
+| 3 | Click **"✨ AI Refinement"** | Button becomes disabled. Hint text appears: "✨ Refining learning goal...". After a few seconds, the goal input updates with a refined, more specific version (e.g., "Develop comprehensive HR management competencies including talent acquisition, employee relations, compensation and benefits administration, and HRIS systems management") |
+| 4 | Observe the refined goal | Toast: "Refined Learning goal successfully." Goal input now contains the AI-refined version |
 | 5 | Try clicking **"✨ AI Refinement"** again | The button should be re-enabled. You can refine again to iterate further |
-| 6 | Edit the refined goal manually, then click **Save & Continue** | The manually edited version of the refined goal is used (not the original) |
+| 6 | Edit the refined goal manually, then click **"Begin Learning"** | The manually edited version of the refined goal is used (not the original) |
 | 7 | Click **"✨ AI Refinement"** with no learner information filled | Refinement should still work but may be less personalized |
 
 ---
@@ -243,7 +244,7 @@ python -m pytest backend/tests/test_onboarding_api.py backend/tests/test_store_a
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Complete onboarding (persona + goal) and click **Save & Continue** | App navigates to the **Skill Gap** page. Spinner appears: "Identifying Skill Gap ..." |
+| 1 | Complete onboarding (select persona, enter goal) and click **"Begin Learning"** | App navigates to the **Skill Gap** page. Spinner appears: "Identifying Skill Gap ..." |
 | 2 | Wait for skill gap identification to complete | Page updates to show a list of skills with: skill name, required level, current level, gap status (red/green), reason, confidence |
 | 3 | Verify summary text | Info banner: "There are X skills in total, with Y skill gaps identified." |
 | 4 | Check each skill card | Each card shows: skill name (numbered), **Required Level** pill selector (unlearned/beginner/intermediate/advanced), **Current Level** pill selector, colored header (red = gap, green = no gap) |
@@ -303,9 +304,9 @@ python -m pytest backend/tests/test_auth_api.py::TestDeleteAccountEndpoint backe
 | `backend/tests/test_store_and_auth.py` | 33 | Flow 1 (auth store/JWT), Flow 2A-2E (profile/event persistence), Flow 3 (data deletion) |
 | `backend/tests/test_user_state.py` | 19 | Flow 2A (persona persistence), Flow 2B (resume text persistence), Flow 2C (goal persistence) |
 | `backend/tests/test_auth_api.py` | 23 | Flow 1 (register/login/me endpoints), Flow 3 (delete account endpoint + lifecycle) |
-| `backend/tests/test_onboarding_api.py` | 21 | Flow 2B (PDF extract), Flow 2D (goal refinement), Flow 2E (skill gap + profile creation + event logging) |
+| `backend/tests/test_onboarding_api.py` | 34 | Flow 2B (PDF extract), Flow 2D (goal refinement), Flow 2E (skill gap + profile creation + event logging), config + personas endpoints |
 | `backend/tests/test_fslsm_update.py` | 2 | Flow 2A (FSLSM dimension updates — integration test, requires LLM API key) |
-| **Total** | **98** | |
+| **Total** | **111** | |
 
 ### Running All Tests
 
@@ -332,3 +333,7 @@ python -m pytest backend/tests/test_fslsm_update.py -v
 3. **Integration tests** (`test_fslsm_update.py`) call real LLMs and require an OpenAI API key configured in the environment.
 
 4. **Frontend tests** are manual — Streamlit does not have a built-in automated testing framework. Follow the step-by-step tables above, checking each expected result. Document any deviations as bugs.
+
+5. **Configuration endpoints** — The backend exposes two read-only configuration endpoints that the frontend (Streamlit or React) fetches at startup. These do not require authentication:
+   - `GET /personas` — Returns the learning persona definitions (names, descriptions, FSLSM dimension values).
+   - `GET /config` — Returns application configuration: skill levels (`["unlearned", "beginner", "intermediate", "advanced"]`), default session count, default LLM type/method, FSLSM threshold values and labels, motivational trigger interval, and max refinement iterations. The frontend falls back to local defaults if the backend is unreachable.

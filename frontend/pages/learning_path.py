@@ -8,6 +8,7 @@ from utils.request_api import (
     simulate_path_feedback,
     refine_learning_path_with_feedback,
     iterative_refine_learning_path,
+    get_app_config,
 )
 from components.navigation import render_navigation
 from utils.state import save_persistent_state
@@ -144,7 +145,7 @@ def render_learning_path():
 
             result = schedule_learning_path(
                 learner_profile=goal.get("learner_profile"),
-                session_count=8,
+                session_count=get_app_config()["default_session_count"],
             )
 
         _store_agent_reasoning(result, "schedule_learning_path")
@@ -223,7 +224,8 @@ def render_path_feedback_section(goal):
                 st.rerun()
 
         with col3:
-            iteration_count = st.selectbox("Iterations", options=[1, 2, 3, 4, 5], index=1, key="auto_refine_iterations")
+            max_iter = get_app_config()["max_refinement_iterations"]
+            iteration_count = st.selectbox("Iterations", options=list(range(1, max_iter + 1)), index=1, key="auto_refine_iterations")
             if st.button("Auto-Refine", type="secondary", use_container_width=True):
                 with st.spinner(f'Auto-refining path ({iteration_count} iterations)...'):
                     result = iterative_refine_learning_path(

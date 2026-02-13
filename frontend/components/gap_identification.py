@@ -1,6 +1,6 @@
 import streamlit as st
 
-from utils.request_api import create_learner_profile, identify_skill_gap
+from utils.request_api import create_learner_profile, identify_skill_gap, get_app_config
 from utils.state import save_persistent_state
 
 def render_identifying_skill_gap(goal):
@@ -20,7 +20,7 @@ def render_identified_skill_gap(goal, method_name="genmentor"):
     """
     Render skill gaps in a card-style with prev/next switching.
     """
-    levels = ["unlearned", "beginner", "intermediate", "advanced"]
+    levels = get_app_config()["skill_levels"]
     # Render all skill cards on a single page (no pagination)
     skill_gaps = goal.get("skill_gaps", [])
     total = len(skill_gaps)

@@ -7,6 +7,8 @@ Covers the backend side of:
   - Profile creation             (POST /create-learner-profile-with-info)
   - Event logging                (POST /events/log)
   - Profile retrieval            (GET  /profile/{user_id})
+  - Personas endpoint            (GET  /personas)
+  - Config endpoint              (GET  /config)
 
 LLM-dependent endpoints are tested with mocked LLM functions so
 these tests run without API keys or network access.
@@ -438,3 +440,102 @@ class TestProfileRetrieval:
     def test_get_profiles_nonexistent_user_returns_404(self, client):
         resp = client.get("/profile/nobody")
         assert resp.status_code == 404
+
+
+# ===================================================================
+# GET /personas  (Persona definitions)
+# ===================================================================
+
+class TestPersonasEndpoint:
+    def test_get_personas_returns_200(self, client):
+        resp = client.get("/personas")
+        assert resp.status_code == 200
+
+    def test_get_personas_has_personas_key(self, client):
+        resp = client.get("/personas")
+        data = resp.json()
+        assert "personas" in data
+
+    def test_get_personas_contains_all_five(self, client):
+        personas = client.get("/personas").json()["personas"]
+        expected = {
+            "Hands-on Explorer",
+            "Reflective Reader",
+            "Visual Learner",
+            "Conceptual Thinker",
+            "Balanced Learner",
+        }
+        assert set(personas.keys()) == expected
+
+    def test_get_personas_each_has_required_fields(self, client):
+        personas = client.get("/personas").json()["personas"]
+        for name, persona in personas.items():
+            assert "description" in persona, f"{name} missing description"
+            assert "fslsm_dimensions" in persona, f"{name} missing fslsm_dimensions"
+            dims = persona["fslsm_dimensions"]
+            for dim_key in ("fslsm_processing", "fslsm_perception", "fslsm_input", "fslsm_understanding"):
+                assert dim_key in dims, f"{name} missing {dim_key}"
+                assert isinstance(dims[dim_key], (int, float)), f"{name}.{dim_key} is not numeric"
+
+    def test_get_personas_dimensions_in_range(self, client):
+        """All FSLSM dimension values should be between -1.0 and 1.0."""
+        personas = client.get("/personas").json()["personas"]
+        for name, persona in personas.items():
+            for dim_key, value in persona["fslsm_dimensions"].items():
+                assert -1.0 <= value <= 1.0, f"{name}.{dim_key} = {value} is out of range"
+
+
+# ===================================================================
+# GET /config  (Application configuration)
+# ===================================================================
+
+class TestConfigEndpoint:
+    def test_get_config_returns_200(self, client):
+        resp = client.get("/config")
+        assert resp.status_code == 200
+
+    def test_get_config_has_all_required_keys(self, client):
+        data = client.get("/config").json()
+        required_keys = [
+            "skill_levels",
+            "default_session_count",
+            "default_llm_type",
+            "default_method_name",
+            "motivational_trigger_interval_secs",
+            "max_refinement_iterations",
+            "fslsm_thresholds",
+        ]
+        for key in required_keys:
+            assert key in data, f"Missing config key: {key}"
+
+    def test_get_config_skill_levels_is_nonempty_list(self, client):
+        data = client.get("/config").json()
+        assert isinstance(data["skill_levels"], list)
+        assert len(data["skill_levels"]) > 0
+
+    def test_get_config_skill_levels_contains_expected_values(self, client):
+        levels = client.get("/config").json()["skill_levels"]
+        assert levels == ["unlearned", "beginner", "intermediate", "advanced"]
+
+    def test_get_config_numeric_values(self, client):
+        data = client.get("/config").json()
+        assert isinstance(data["default_session_count"], int)
+        assert data["default_session_count"] > 0
+        assert isinstance(data["motivational_trigger_interval_secs"], int)
+        assert data["motivational_trigger_interval_secs"] > 0
+        assert isinstance(data["max_refinement_iterations"], int)
+        assert data["max_refinement_iterations"] > 0
+
+    def test_get_config_fslsm_thresholds_has_all_dimensions(self, client):
+        thresholds = client.get("/config").json()["fslsm_thresholds"]
+        for dim in ("perception", "understanding", "processing", "input"):
+            assert dim in thresholds, f"Missing fslsm_thresholds dimension: {dim}"
+
+    def test_get_config_fslsm_thresholds_have_required_fields(self, client):
+        thresholds = client.get("/config").json()["fslsm_thresholds"]
+        for dim, cfg in thresholds.items():
+            for field in ("low_threshold", "high_threshold", "low_label", "high_label", "neutral_label"):
+                assert field in cfg, f"fslsm_thresholds.{dim} missing {field}"
+            assert isinstance(cfg["low_threshold"], (int, float))
+            assert isinstance(cfg["high_threshold"], (int, float))
+            assert cfg["low_threshold"] < cfg["high_threshold"]
