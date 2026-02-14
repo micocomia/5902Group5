@@ -20,10 +20,12 @@ from base.llm_factory import LLMFactory
 from base.searcher_factory import SearchRunner
 from base.search_rag import SearchRagManager
 from fastapi.responses import JSONResponse
-from modules.skill_gap_identification import *
-from modules.adaptive_learner_modeling import *
-from modules.personalized_resource_delivery import *
-from modules.personalized_resource_delivery.agents.learning_path_scheduler import refine_learning_path_with_llm
+from modules.skill_gap import *
+from modules.learner_profiler import *
+from modules.learning_plan_generator import *
+from modules.learning_plan_generator.agents.learning_path_scheduler import refine_learning_path_with_llm
+from modules.content_generator import *
+from modules.learner_simulator import simulate_path_feedback_with_llm, simulate_content_feedback_with_llm
 from modules.ai_chatbot_tutor import chat_with_tutor_with_llm
 from api_schemas import *
 from config import load_config
