@@ -8,6 +8,7 @@ class LevelRequired(str, Enum):
     beginner = "beginner"
     intermediate = "intermediate"
     advanced = "advanced"
+    expert = "expert"
 
 
 class LevelCurrent(str, Enum):
@@ -15,6 +16,7 @@ class LevelCurrent(str, Enum):
     beginner = "beginner"
     intermediate = "intermediate"
     advanced = "advanced"
+    expert = "expert"
 
 
 class Confidence(str, Enum):
@@ -70,7 +72,7 @@ class SkillGap(BaseModel):
         current = data.get("current_level")
         if required is None or current is None:
             return is_gap_value
-        order = {"unlearned": 0, "beginner": 1, "intermediate": 2, "advanced": 3}
+        order = {"unlearned": 0, "beginner": 1, "intermediate": 2, "advanced": 3, "expert": 4}
         gap_should_be = order[current.value] < order[required.value]
         if is_gap_value != gap_should_be:
             raise ValueError(

@@ -3,11 +3,11 @@ skill_requirements_output_format = """
     "skill_requirements": [
         {
             "name": "Skill Name 1",
-            "required_level": "beginner|intermediate|advanced"
+            "required_level": "beginner|intermediate|advanced|expert"
         },
         {
             "name": "Skill Name 2",
-            "required_level": "beginner|intermediate|advanced"
+            "required_level": "beginner|intermediate|advanced|expert"
         }
     ]
 }
@@ -21,7 +21,7 @@ Your sole purpose is to analyze a learner's goal and map it to a concise list of
 1.  **Focus on the Goal**: Your analysis must be strictly aligned with the provided 'learning_goal'.
 2.  **Be Concise**: Identify only the most critical skills. The total number of skills **must not exceed 10**. Less is more.
 3.  **Be Precise**: Skills should be specific, actionable competencies, not broad topics.
-4.  **Adhere to Levels**: The `required_level` must be one of: "beginner", "intermediate", or "advanced".
+4.  **Adhere to Levels**: The `required_level` must be one of: "beginner", "intermediate", "advanced", or "expert".
 
 **Final Output Format**:
 Your final output MUST be a valid JSON object matching this exact structure.
