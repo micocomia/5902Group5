@@ -2,7 +2,12 @@ ground_truth_profile_creator_system_prompt = """
 You are tasked with creating a ground-truth learner profile based on the provided learner information. This profile will simulate an accurate representation of the learner's goals, skills, preferences, and potential knowledge gaps. It will serve as the baseline for simulating learner behaviors in subsequent steps.
 
 Generate a profile with the following components:
-- **Cognitive Status**: Mastered skills, in-progress skills, and knowledge gaps relevant to the learner's goals.
+- **Cognitive Status**: Mastered skills, in-progress skills, and knowledge gaps relevant to the learner's goals. Proficiency levels follow the SOLO taxonomy:
+  * `unlearned` (Prestructural): No relevant understanding.
+  * `beginner` (Unistructural): Grasps one relevant aspect in isolation.
+  * `intermediate` (Multistructural): Knows multiple aspects but hasn't integrated them.
+  * `advanced` (Relational): Integrates concepts into a coherent whole.
+  * `expert` (Extended Abstract): Can generalize and transfer knowledge to new contexts.
 - **Learning Preferences**: Felder-Silverman Learning Style Model (FSLSM) dimension values between -1 and 1 for processing (active↔reflective), perception (sensing↔intuitive), input (visual↔verbal), and understanding (sequential↔global).
 - **Behavioral Patterns**: Expected engagement patterns, such as frequency of participation and session duration preferences.
 """
@@ -82,7 +87,7 @@ Simulate the learner's progression by updating the ground-truth profile based on
 Follow these instructions for updating each component:
 
 1. **Cognitive Status Update**:
-    - **Mastered Skills**: If any skill shows significant improvement, consider moving it to the mastered skills list. Reflect the final proficiency level (e.g., from intermediate to advanced) based on observed session performance.
+    - **Mastered Skills**: If any skill shows significant improvement, consider moving it to the mastered skills list. Reflect the final proficiency level (e.g., from intermediate to advanced, or from advanced to expert) based on observed session performance. Proficiency transitions represent qualitative shifts: intermediate → advanced means concepts are now integrated; advanced → expert means knowledge can be generalized to new contexts.
     - **In-Progress Skills**: For skills currently in progress, increase the progress percentage to reflect session efforts. Adjust the expected proficiency level if the learner shows unexpected improvement or struggles.
     - **Knowledge Gaps**: If the session reveals new areas where the learner lacks understanding, add these as knowledge gaps. Conversely, if they demonstrate mastery over prior gaps, mark those gaps as resolved.
 
@@ -110,7 +115,7 @@ After each session, the profile should reflect a realistic progression that mimi
             "mastered_skills": [
                 {{
                     "skill": "Skill Name",
-                    "proficiency_level": "advanced (final actual proficiency level)"
+                    "proficiency_level": "advanced (one of: beginner, intermediate, advanced, expert)"
                 }}
             ],
             "in_progress_skills": [

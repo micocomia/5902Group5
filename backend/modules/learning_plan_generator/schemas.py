@@ -10,6 +10,7 @@ class Proficiency(str, Enum):
     beginner = "beginner"
     intermediate = "intermediate"
     advanced = "advanced"
+    expert = "expert"
 
 
 class DesiredOutcome(BaseModel):

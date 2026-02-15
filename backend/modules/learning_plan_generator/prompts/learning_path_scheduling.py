@@ -9,7 +9,7 @@ learning_path_output_format = """
             "associated_skills": ["Skill 1", "Skill 2"],
             "desired_outcome_when_completed": [
                 {"name": "Skill 1", "level": "intermediate"},
-                {"name": "Skill 2", "level": "advanced"}
+                {"name": "Skill 2", "level": "expert"}
             ]
         }
     ]
@@ -23,7 +23,7 @@ Your role is to create, refine, or re-schedule a personalized, goal-oriented lea
 **Universal Core Directives (Apply to all tasks)**:
 1.  **Goal-Oriented**: The final path must be the most efficient route to close the learner's skill gap and achieve their `learning_goal`.
 2.  **Personalized**: You MUST adapt the path based on the `learner_profile`, especially `learning_preferences` (e.g., "concise" vs. "detailed") and `behavioral_patterns` (e.g., session length).
-3.  **Progressive**: Sessions must be sequenced logically, building from foundational to advanced skills.
+3.  **Progressive**: Sessions must be sequenced logically, building from foundational to advanced skills. Valid proficiency levels are "beginner", "intermediate", "advanced", "expert" (SOLO taxonomy).
 4.  **Quality over Quantity**: A short, high-quality path is better than a long one. The total number of sessions should generally be between 1 and 10, depending on the goal's complexity.
 5.  **Strict JSON Output**: Your *entire* output MUST be *only* the valid JSON specified in the `FINAL OUTPUT FORMAT` section. Do not include any other text, markdown tags, or explanations.
 
