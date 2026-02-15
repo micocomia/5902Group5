@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List
-from pydantic import BaseModel, Field, RootModel, field_validator
+from pydantic import BaseModel, Field, RootModel, field_validator, model_validator
 
 
 
@@ -64,21 +64,15 @@ class SkillGap(BaseModel):
             raise ValueError("Reason must be 20 words or fewer.")
         return v
 
-    @field_validator("is_gap")
-    @classmethod
-    def check_gap_consistency(cls, is_gap_value, info):
-        data = info.data
-        required = data.get("required_level")
-        current = data.get("current_level")
-        if required is None or current is None:
-            return is_gap_value
+    @model_validator(mode="after")
+    def check_gap_consistency(self):
         order = {"unlearned": 0, "beginner": 1, "intermediate": 2, "advanced": 3, "expert": 4}
-        gap_should_be = order[current.value] < order[required.value]
-        if is_gap_value != gap_should_be:
+        gap_should_be = order[self.current_level.value] < order[self.required_level.value]
+        if self.is_gap != gap_should_be:
             raise ValueError(
-                f'is_gap inconsistency: required="{required.value}", current="{current.value}" implies is_gap={gap_should_be}.'
+                f'is_gap inconsistency: required="{self.required_level.value}", current="{self.current_level.value}" implies is_gap={gap_should_be}.'
             )
-        return is_gap_value
+        return self
 
 
 class SkillGaps(BaseModel):
