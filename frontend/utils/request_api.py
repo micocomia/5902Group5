@@ -580,7 +580,7 @@ def get_personas():
 # ---- Application config (fetched from backend, with local fallback) ----
 
 _LOCAL_APP_CONFIG = {
-    "skill_levels": ["unlearned", "beginner", "intermediate", "advanced"],
+    "skill_levels": ["unlearned", "beginner", "intermediate", "advanced", "expert"],
     "default_session_count": 8,
     "default_llm_type": "gpt4o",
     "default_method_name": "genmentor",

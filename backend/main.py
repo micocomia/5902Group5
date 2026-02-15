@@ -319,7 +319,7 @@ async def get_personas():
 
 
 APP_CONFIG = {
-    "skill_levels": ["unlearned", "beginner", "intermediate", "advanced"],
+    "skill_levels": ["unlearned", "beginner", "intermediate", "advanced", "expert"],
     "default_session_count": 8,
     "default_llm_type": "gpt4o",
     "default_method_name": "genmentor",

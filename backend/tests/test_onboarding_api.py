@@ -515,7 +515,7 @@ class TestConfigEndpoint:
 
     def test_get_config_skill_levels_contains_expected_values(self, client):
         levels = client.get("/config").json()["skill_levels"]
-        assert levels == ["unlearned", "beginner", "intermediate", "advanced"]
+        assert levels == ["unlearned", "beginner", "intermediate", "advanced", "expert"]
 
     def test_get_config_numeric_values(self, client):
         data = client.get("/config").json()

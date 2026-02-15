@@ -247,14 +247,17 @@ python -m pytest backend/tests/test_onboarding_api.py backend/tests/test_store_a
 | 1 | Complete onboarding (select persona, enter goal) and click **"Begin Learning"** | App navigates to the **Skill Gap** page. Spinner appears: "Identifying Skill Gap ..." |
 | 2 | Wait for skill gap identification to complete | Page updates to show a list of skills with: skill name, required level, current level, gap status (red/green), reason, confidence |
 | 3 | Verify summary text | Info banner: "There are X skills in total, with Y skill gaps identified." |
-| 4 | Check each skill card | Each card shows: skill name (numbered), **Required Level** pill selector (unlearned/beginner/intermediate/advanced), **Current Level** pill selector, colored header (red = gap, green = no gap) |
+| 4 | Check each skill card | Each card shows: skill name (numbered), **Required Level** pill selector (beginner/intermediate/advanced/expert), **Current Level** pill selector (unlearned/beginner/intermediate/advanced/expert), colored header (red = gap, green = no gap) |
 | 5 | Expand **"More Analysis Details"** on a skill | Shows reason and confidence level. Shows warning if current < required, success message if current >= required |
 | 6 | Change a skill's **Current Level** from "beginner" to "advanced" (higher than required) | Card header turns green. Gap toggle auto-disables. "Mark as Gap" toggle reflects the change. State saves automatically |
 | 7 | Change a skill's **Required Level** to a higher value than current | Card header turns red. Skill is marked as a gap |
-| 8 | Toggle **"Mark as Gap"** off on a gap skill | Gap is removed, current level is set to match required level |
-| 9 | Verify resume influence (if resume was uploaded) | If a resume was uploaded in onboarding, the AI should have used it to set more accurate current levels. For example, if your resume says "5 years Python experience", Python-related skills should show higher current levels |
-| 10 | Click **"Schedule Learning Path"** | Spinner: "Creating your profile ...". After completion, toast: "Your profile has been created!". App navigates to the **Learning Path** page. Onboarding is marked as complete (`if_complete_onboarding = True`) |
-| 11 | Navigate to **My Profile** page | The created learner profile should show: cognitive status (overall progress, mastered skills, in-progress skills), learning preferences (FSLSM dimensions matching your persona), behavioral patterns |
+| 8 | Change a skill's **Required Level** to "expert" and **Current Level** to "advanced" | Card header turns red (gap). Skill is marked as a gap because advanced < expert |
+| 9 | Change the **Current Level** to "expert" | Card header turns green. Skill is no longer a gap (expert >= expert) |
+| 10 | Toggle **"Mark as Gap"** off on a gap skill | Gap is removed, current level is set to match required level |
+| 11 | Verify resume influence (if resume was uploaded) | If a resume was uploaded in onboarding, the AI should have used it to set more accurate current levels. For example, if your resume says "5 years Python experience", Python-related skills should show higher current levels |
+| 12 | Click **"Schedule Learning Path"** | Spinner: "Creating your profile ...". After completion, toast: "Your profile has been created!". App navigates to the **Learning Path** page. Onboarding is marked as complete (`if_complete_onboarding = True`) |
+| 13 | Navigate to **My Profile** page | The created learner profile should show: cognitive status (overall progress, mastered skills, in-progress skills), learning preferences (FSLSM dimensions matching your persona), behavioral patterns |
+| 14 | Navigate to **Dashboard** page | Radar chart shows 5-level radial axis: Unlearned (0), Beginner (1), Intermediate (2), Advanced (3), Expert (4). Required and current level traces are plotted correctly |
 
 ---
 
@@ -336,4 +339,4 @@ python -m pytest backend/tests/test_fslsm_update.py -v
 
 5. **Configuration endpoints** — The backend exposes two read-only configuration endpoints that the frontend (Streamlit or React) fetches at startup. These do not require authentication:
    - `GET /personas` — Returns the learning persona definitions (names, descriptions, FSLSM dimension values).
-   - `GET /config` — Returns application configuration: skill levels (`["unlearned", "beginner", "intermediate", "advanced"]`), default session count, default LLM type/method, FSLSM threshold values and labels, motivational trigger interval, and max refinement iterations. The frontend falls back to local defaults if the backend is unreachable.
+   - `GET /config` — Returns application configuration: skill levels (`["unlearned", "beginner", "intermediate", "advanced", "expert"]`), default session count, default LLM type/method, FSLSM threshold values and labels, motivational trigger interval, and max refinement iterations. The frontend falls back to local defaults if the backend is unreachable.
