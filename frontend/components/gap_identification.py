@@ -10,6 +10,7 @@ def render_identifying_skill_gap(goal):
         llm_type = st.session_state["llm_type"]
         skill_gaps = identify_skill_gap(learning_goal, learner_information, llm_type)
     goal["skill_gaps"] = skill_gaps
+    goal["_last_identified_goal"] = goal["learning_goal"]
     save_persistent_state()
     st.rerun()
     st.toast("🎉 Successfully identify skill gaps!")
@@ -21,6 +22,7 @@ def render_identified_skill_gap(goal, method_name="genmentor"):
     Render skill gaps in a card-style with prev/next switching.
     """
     levels = get_app_config()["skill_levels"]
+    required_levels = [l for l in levels if l != "unlearned"]
     # Render all skill cards on a single page (no pagination)
     skill_gaps = goal.get("skill_gaps", [])
     total = len(skill_gaps)
@@ -30,7 +32,7 @@ def render_identified_skill_gap(goal, method_name="genmentor"):
 
     for skill_id, skill_info in enumerate(skill_gaps):
         skill_name = skill_info.get("name", f"skill_{skill_id}")
-        required_level = skill_info.get("required_level", levels[0])
+        required_level = skill_info.get("required_level", required_levels[0])
         current_level = skill_info.get("current_level", levels[0])
 
         background_color = "#ffe6e6" if skill_info.get("is_gap") else "#e6ffe6"
@@ -50,7 +52,7 @@ def render_identified_skill_gap(goal, method_name="genmentor"):
             # Required level selector
             new_required_level = st.pills(
                 "**Required Level**",
-                options=levels,
+                options=required_levels,
                 selection_mode="single",
                 default=required_level,
                 disabled=False,
@@ -76,7 +78,7 @@ def render_identified_skill_gap(goal, method_name="genmentor"):
             )
             if new_current_level != current_level:
                 goal["skill_gaps"][skill_id]["current_level"] = new_current_level
-                if levels.index(new_current_level) < levels.index(goal["skill_gaps"][skill_id].get("required_level", levels[0])):
+                if levels.index(new_current_level) < levels.index(goal["skill_gaps"][skill_id].get("required_level", required_levels[0])):
                     goal["skill_gaps"][skill_id]["is_gap"] = True
                 else:
                     goal["skill_gaps"][skill_id]["is_gap"] = False
@@ -85,7 +87,7 @@ def render_identified_skill_gap(goal, method_name="genmentor"):
 
             # Details
             with st.expander("More Analysis Details"):
-                if levels.index(goal["skill_gaps"][skill_id].get("current_level", levels[0])) < levels.index(goal["skill_gaps"][skill_id].get("required_level", levels[0])):
+                if levels.index(goal["skill_gaps"][skill_id].get("current_level", levels[0])) < levels.index(goal["skill_gaps"][skill_id].get("required_level", required_levels[0])):
                     st.warning("Current level is lower than the required level!")
                     goal["skill_gaps"][skill_id]["is_gap"] = True
                 else:

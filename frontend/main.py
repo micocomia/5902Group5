@@ -125,6 +125,10 @@ st.divider()
 # Optional: display agent reasoning/trace for ethics/transparency demos
 render_reasoning_panel(st.sidebar)
 
+# API debug sidebar (available on all pages)
+from components.debug_sidebar import render_debug_sidebar
+render_debug_sidebar()
+
 # ---- Learning analytics (defensive) ----
 # The app may reach this page before goals are loaded/created. Avoid crashes.
 st.session_state.setdefault("learned_skills_history", {})

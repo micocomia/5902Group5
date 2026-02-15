@@ -233,7 +233,7 @@ def change_selected_goal_id(new_goal_id):
 def get_existing_goal_id_list():
     return [goal["id"] for goal in st.session_state["goals"]]
 
-def add_new_goal(learning_goal="", skill_gaps=[], learner_profile={}, learning_path=[], is_completed=False, is_deleted=False):
+def add_new_goal(learning_goal="", skill_gaps=[], learner_profile={}, learning_path=[], is_completed=False, is_deleted=False, **_kwargs):
     goal_uid = get_new_goal_uid()
     goal_info = {
         "id": goal_uid,

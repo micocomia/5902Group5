@@ -243,9 +243,10 @@ def render_onboard():
             if uploaded_file is not None:
                 with st.spinner("Extracting text from PDF..."):
                     learner_information_pdf = extract_text_from_pdf(uploaded_file)
+                    st.session_state["learner_information_pdf"] = learner_information_pdf
                     st.toast("✅ PDF uploaded successfully.")
             else:
-                learner_information_pdf = ""
+                learner_information_pdf = st.session_state.get("learner_information_pdf", "")
                 st.markdown(
                     '<div class="action-card">'
                     '<span class="action-icon">ℹ️</span>'
@@ -279,6 +280,11 @@ def render_onboard():
                 if not goal["learning_goal"] or not st.session_state.get("learner_persona"):
                     st.warning("Please provide both a learning goal and select a learning persona before continuing.")
                 else:
+                    # Clear stale skill gaps if the learning goal changed
+                    previous_goal = goal.get("_last_identified_goal", "")
+                    if goal["learning_goal"] != previous_goal:
+                        goal["skill_gaps"] = []
+                        goal["learner_profile"] = {}
                     st.session_state["selected_page"] = "Skill Gap"
                     try:
                         save_persistent_state()

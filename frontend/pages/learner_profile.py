@@ -107,35 +107,28 @@ def render_learning_preferences(goal):
     inp = _get_dim(dims, "input")
     understanding = _get_dim(dims, "understanding")
 
-    # Raw vector display (helps verify how it varies across runs/goals)
-    st.caption("Raw FSLSM vector (−1.0 to +1.0):")
-    st.table({
-        "dimension": ["processing", "perception", "input", "understanding"],
-        "value": [processing, perception, inp, understanding],
-    })
-
     slider_specs = [
-        ("processing", "Active", "Reflective", processing),
-        ("perception", "Sensing", "Intuitive", perception),
-        ("input", "Visual", "Verbal", inp),
-        ("understanding", "Sequential", "Global", understanding),
+        ("Processing", "Active", "Reflective", processing),
+        ("Perception", "Sensing", "Intuitive", perception),
+        ("Input", "Visual", "Verbal", inp),
+        ("Understanding", "Sequential", "Global", understanding),
     ]
 
-    for name, left_label, right_label, value in slider_specs:
+    for label, left_label, right_label, value in slider_specs:
+        st.caption(f"{label}")
         col1, col2, col3 = st.columns([1, 3, 1])
         with col1:
             st.markdown(f"**{left_label}**")
         with col2:
             st.slider(
-                label=name,
+                label=label,
                 min_value=-1.0,
                 max_value=1.0,
                 value=float(value),
                 step=0.1,
                 disabled=True,
                 label_visibility="collapsed",
-                # stable key; avoids accidental "fslsm_fslsm_processing" etc.
-                key=f"fslsm_slider_{name}",
+                key=f"fslsm_slider_{label.lower()}",
             )
         with col3:
             st.markdown(f"**{right_label}**")
