@@ -10,6 +10,7 @@ class RequiredLevel(str, Enum):
     beginner = "beginner"
     intermediate = "intermediate"
     advanced = "advanced"
+    expert = "expert"
 
 
 class CurrentLevel(str, Enum):
@@ -17,6 +18,7 @@ class CurrentLevel(str, Enum):
     beginner = "beginner"
     intermediate = "intermediate"
     advanced = "advanced"
+    expert = "expert"
 
 
 class MasteredSkill(BaseModel):

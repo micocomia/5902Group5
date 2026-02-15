@@ -7,14 +7,14 @@ learner_profile_output_format = """
 		"mastered_skills": [
 			{{
 				"name": "Skill Name",
-				"proficiency_level": "advanced (final actual proficiency level)"
+				"proficiency_level": "advanced (one of: beginner, intermediate, advanced, expert)"
 			}}
 		],
 		"in_progress_skills": [
 			{{
 				"name": "Skill Name",
-				"required_proficiency_level": "advanced (expected proficiency level)",
-				"current_proficiency_level": "intermediate (current proficiency level)"
+				"required_proficiency_level": "advanced (one of: beginner, intermediate, advanced, expert)",
+				"current_proficiency_level": "intermediate (one of: unlearned, beginner, intermediate, advanced, expert)"
 			}}
 		]
 	}},
@@ -44,6 +44,13 @@ This profile will be used to personalize the learning experience and align it wi
 
 **Profile Components**:
 - Cognitive Status: Identify and outline the learner's current knowledge level and skills mastered relevant to the target goal. Continuously update this status based on quiz scores, feedback, and interactions in each session, noting progress in mastery for each required skill.
+  Proficiency levels follow the SOLO taxonomy and represent qualitative shifts in understanding:
+  * `unlearned` (Prestructural): No relevant understanding of the skill.
+  * `beginner` (Unistructural): Grasps one relevant aspect in isolation.
+  * `intermediate` (Multistructural): Knows multiple aspects but hasn't integrated them.
+  * `advanced` (Relational): Integrates concepts into a coherent whole.
+  * `expert` (Extended Abstract): Can generalize and transfer knowledge to new contexts.
+  When assessing proficiency, reason about the *nature* of the learner's understanding, not just the quantity of facts. For example, if a learner recalls multiple facts but cannot explain relationships between them, that indicates `intermediate` (Multistructural), not `advanced`.
 - Learning Preferences: Characterize the learner using the Felder-Silverman Learning Style Model (FSLSM). Set four dimension values between -1 and 1:
   * fslsm_processing: -1 (active/hands-on learner) to 1 (reflective/observation-based learner)
   * fslsm_perception: -1 (sensing/concrete, prefers facts and examples) to 1 (intuitive/abstract, prefers theories and concepts)
@@ -64,7 +71,7 @@ Task A. Initial Profiling:
 Chain of Thoughts for Task A
 1. Interpret the learner's resume to identify relevant skills and knowledge.
 2. Determine the learner's learning goal and the required proficiency levels, must put entire learning goal into the profile.
-3. Assess the learner's cognitive status, including mastered skills and knowledge gaps (If the current proficiency level is equal or higher than the required proficiency level, must move the skill to the mastered list).
+3. Assess the learner's cognitive status, including mastered skills and knowledge gaps (If the current proficiency level is equal or higher than the required proficiency level, must move the skill to the mastered list). Use SOLO-level reasoning when categorizing skills: determine whether the learner has no understanding (unlearned), grasps a single aspect (beginner), knows multiple aspects without integration (intermediate), integrates concepts coherently (advanced), or can generalize to new contexts (expert).
 4. If the learner information includes initial FSLSM dimension values (from a persona selection), use those as the baseline. Only adjust values if the resume or other learner information provides strong evidence for a different learning style. Otherwise, preserve the provided values.
 5. Consider the learner's behavioral patterns to enhance engagement and motivation.
 
@@ -75,7 +82,7 @@ Task B. Profile Update:
 
 Chain of Thoughts for Task B
 1. Monitor the learner's progress through quiz scores, feedback, and session interactions.
-2. Update the cognitive status to reflect the learner's mastery of skills.
+2. Update the cognitive status to reflect the learner's mastery of skills. Remember that proficiency transitions represent qualitative shifts in understanding (e.g., intermediate → advanced means the learner now *integrates* concepts into a coherent whole, not just accumulates more facts; advanced → expert means the learner can now *generalize and transfer* knowledge to new contexts).
 3. Adjust FSLSM dimension values based on engagement and satisfaction reports.
 4. Adapt behavioral patterns to maintain consistent engagement and motivation.
 
@@ -84,7 +91,7 @@ Chain of Thoughts for Task B
 adaptive_learner_profiler_basic_system_prompt_requirements = """
 **Requirements**:
 - All the skills in the skill gap should be categorized as mastered or in-progress into the learner's current status.
-- `proficiency_level` should be one of: "unleared", "beginner", "intermediate", "advanced".
+- `proficiency_level` should be one of: "unlearned", "beginner", "intermediate", "advanced", "expert".
 - Ensure that the output captures the most critical elements of the learner's current status, preferences, and challenges.
 - The profile should include any information that may impact the learner's learning experience and progress.
 """
@@ -125,6 +132,7 @@ Based on the provided data, update the learner's profile with the following chan
 
 For example,
 Session Information: {{'id': 'Session 2', 'title': 'Intermediate Data Analysis Techniques', 'if_learned': True, 'desired_outcome_when_completed': [{{'name': 'Data Analysis', 'level': 'intermediate'}}]}}
+(Note: valid levels are "unlearned", "beginner", "intermediate", "advanced", "expert")
 - If `if_learned` is True, update the cognitive status to reflect the new proficiency level.
 - If the required proficiency level has been fulfilled, move the skill to the mastered list.
 	- If `if_learned` is True and the outcome level is equal or higher than the required level, Must move the skill to the mastered list!!!!!!
