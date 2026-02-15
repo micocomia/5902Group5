@@ -138,7 +138,8 @@ def render_session_details(goal):
             st.rerun()
 
         if st.session_state.get("if_updating_learner_profile"):
-            update_result = update_learner_profile_with_feedback(goal, "", session_info)
+            with st.spinner("Updating your learner profile..."):
+                update_result = update_learner_profile_with_feedback(goal, "", session_info)
             st.session_state["if_updating_learner_profile"] = False
             try:
                 save_persistent_state()
@@ -151,15 +152,13 @@ def render_session_details(goal):
                 st.toast("🎉 Session completed successfully!")
                 goal["learning_path"][selected_sid]["if_learned"] = True
                 st.session_state["selected_page"] = "Learning Path"
+                if get_current_session_uid() in st.session_state["session_learning_times"]:
+                    curr_time = time.time()
+                    st.session_state["session_learning_times"][get_current_session_uid()]["end_time"] = curr_time
                 try:
                     save_persistent_state()
                 except Exception:
                     pass
-                if get_current_session_uid() in st.session_state["session_learning_times"]:
-                    curr_time = time.time()
-                    st.session_state["session_learning_times"][get_current_session_uid()]["end_time"] = curr_time
-                    
-                save_persistent_state()
                 st.switch_page("pages/learning_path.py")
 
     st.write(f"# {session_info['id']}")
@@ -277,16 +276,9 @@ def render_document_content_by_section(document):
     page_key = f"{selected_gid}-{session_id}"
     params = {}
     try:
-        if hasattr(st, 'query_params') and isinstance(st.query_params, dict):
-            params = dict(st.query_params)
+        params = dict(st.query_params)
     except Exception:
         pass
-    if not params and hasattr(st, 'experimental_get_query_params'):
-        try:
-            raw = st.experimental_get_query_params()
-            params = {k: (v[0] if isinstance(v, list) and v else v) for k, v in raw.items()}
-        except Exception:
-            params = {}
 
     if 'gm_page' in params:
         try:

@@ -85,7 +85,8 @@ def render_existing_goals():
     for goal_id, goal in enumerate(non_deleted_goals):
         with st.container():
             col_left, col_right = st.columns([3, 1])
-            col_left.write(f"#### Goal {goal_id + 1}")
+            display_name = goal.get("learner_profile", {}).get("goal_display_name", "") or f"Goal {goal_id + 1}"
+            col_left.write(f"#### {display_name}")
             
             # Check if the current goal is the active goal
             is_active = st.session_state.get("selected_goal_id") == goal["id"]
@@ -109,11 +110,32 @@ def render_existing_goals():
             st.info(f"{goal['learning_goal']}")
             st.write(f"**Overall Progress:**")
             learner_profile = goal["learner_profile"]
-            overall_progress = learner_profile["cognitive_status"]["overall_progress"]
+            learning_path = goal.get("learning_path", [])
+            if learning_path:
+                learned_sessions = sum(1 for s in learning_path if isinstance(s, dict) and s.get("if_learned"))
+                overall_progress = int((learned_sessions / len(learning_path)) * 100)
+            else:
+                overall_progress = learner_profile["cognitive_status"]["overall_progress"]
             progress = st.slider("Progress", min_value=0, max_value=100, value=overall_progress, key=f"progress_{goal['id']}", disabled=True)
-            unlearned_skill = len(goal['learner_profile']['cognitive_status']['in_progress_skills'])
-            learned_skill = len(goal['learner_profile']['cognitive_status']['mastered_skills'])
-            all_skill = learned_skill + unlearned_skill
+            if learning_path:
+                mastered_skills = set()
+                all_skills = set()
+                for s in learning_path:
+                    if not isinstance(s, dict):
+                        continue
+                    for outcome in s.get("desired_outcome_when_completed", []):
+                        skill_name = outcome.get("name", "") if isinstance(outcome, dict) else ""
+                        if skill_name:
+                            all_skills.add(skill_name)
+                            if s.get("if_learned"):
+                                mastered_skills.add(skill_name)
+                all_skill = len(all_skills)
+                learned_skill = len(mastered_skills)
+                unlearned_skill = all_skill - learned_skill
+            else:
+                unlearned_skill = len(goal['learner_profile']['cognitive_status']['in_progress_skills'])
+                learned_skill = len(goal['learner_profile']['cognitive_status']['mastered_skills'])
+                all_skill = learned_skill + unlearned_skill
             col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
                 st.metric(label="Total Skill Count", value=all_skill, delta_color="off")

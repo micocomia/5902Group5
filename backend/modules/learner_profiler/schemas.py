@@ -110,6 +110,7 @@ class BehavioralPatterns(BaseModel):
 class LearnerProfile(BaseModel):
     learner_information: str
     learning_goal: str
+    goal_display_name: str = ""
     cognitive_status: CognitiveStatus
     learning_preferences: LearningPreferences
     behavioral_patterns: BehavioralPatterns

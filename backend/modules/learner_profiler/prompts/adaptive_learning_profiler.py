@@ -1,5 +1,6 @@
 learner_profile_output_format = """
 {{
+	"goal_display_name": "A short 3-5 word descriptive name for the learning goal (e.g., 'French for Data Science')",
 	"learner_information": "Summary of the learner's information (should include any information that may related to learning goal and impact learning)",
 	"learning_goal": "learner's input learning goal (should be same with the provide learning goal",
 	"cognitive_status": {{

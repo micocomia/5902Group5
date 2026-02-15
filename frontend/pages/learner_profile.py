@@ -155,7 +155,8 @@ def render_learning_preferences(goal):
     st.info(prefs.get('additional_notes', 'None'))
 
 def render_behavioral_patterns(goal):
-    st.markdown("#### Behavioral Patterns")
+    goal_name = (goal.get("learner_profile", {}).get("goal_display_name", "") or goal.get("learning_goal", "Current Goal")) if isinstance(goal, dict) else "Current Goal"
+    st.markdown(f"#### Behavioral Patterns — {goal_name}")
 
     # Fetch real metrics from backend
     user_id = st.session_state.get("userId")
@@ -225,7 +226,7 @@ def render_behavioral_patterns(goal):
 
 def render_additional_info_form(goal):
     with st.form(key="additional_info_form"):
-        st.markdown("#### Value Your Feedback")
+        st.markdown("#### Update Learning Preferences")
         st.info("Help us improve your learning experience by providing your feedback below.")
         st.write("How much do you agree with the current profile? *")
         agreement_star = st.feedback("stars", key="agreement_star")

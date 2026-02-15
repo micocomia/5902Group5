@@ -532,20 +532,32 @@ async def update_learner_profile(request: LearnerProfileUpdateRequest):
     learner_information = request.learner_information
     session_information = request.session_information
     try:
-        for name in ("learner_profile", "learner_interactions", "learner_information", "session_information"):
-            val = locals()[name]
-            if isinstance(val, str) and val.strip():
-                try:
-                    locals()[name] = ast.literal_eval(val)
-                except Exception:
-                    if name != "session_information":
-                        locals()[name] = {"raw": val}
+        if isinstance(learner_profile, str) and learner_profile.strip():
+            try:
+                learner_profile = ast.literal_eval(learner_profile)
+            except Exception:
+                learner_profile = {"raw": learner_profile}
+        if isinstance(learner_interactions, str) and learner_interactions.strip():
+            try:
+                learner_interactions = ast.literal_eval(learner_interactions)
+            except Exception:
+                learner_interactions = {"raw": learner_interactions}
+        if isinstance(learner_information, str) and learner_information.strip():
+            try:
+                learner_information = ast.literal_eval(learner_information)
+            except Exception:
+                learner_information = {"raw": learner_information}
+        if isinstance(session_information, str) and session_information.strip():
+            try:
+                session_information = ast.literal_eval(session_information)
+            except Exception:
+                pass
         learner_profile = update_learner_profile_with_llm(
             llm,
-            locals()["learner_profile"],
-            locals()["learner_interactions"],
-            locals()["learner_information"],
-            locals()["session_information"],
+            learner_profile,
+            learner_interactions,
+            learner_information,
+            session_information,
         )
         if request.user_id is not None and request.goal_id is not None:
             store.upsert_profile(request.user_id, request.goal_id, learner_profile)
