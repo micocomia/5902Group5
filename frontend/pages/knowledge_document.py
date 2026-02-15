@@ -77,10 +77,10 @@ def render_learning_content():
 
             st.divider()
             render_content_feedback_form(goal)
-            render_motivataional_triggers()
+            render_motivational_triggers()
 
 
-def render_motivataional_triggers():
+def render_motivational_triggers():
     curr_time = time.time()
     session_uid = get_current_session_uid()
     session_learning_times = st.session_state["session_learning_times"][session_uid]

@@ -206,6 +206,68 @@ async def delete_user_state(user_id: str):
     return {"ok": True}
 
 
+@app.get("/behavioral-metrics/{user_id}")
+async def get_behavioral_metrics(user_id: str, goal_id: Optional[int] = None):
+    state = store.get_user_state(user_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="No state found for this user_id")
+
+    session_times = state.get("session_learning_times", {})
+    mastery_history = state.get("learned_skills_history", {})
+    goals = state.get("goals", [])
+
+    # Filter sessions for the requested goal (keys are "{goal_id}-{session_id}")
+    prefix = f"{goal_id}-" if goal_id is not None else None
+    completed = []
+    total_triggers = 0
+    for key, times in session_times.items():
+        if not isinstance(times, dict):
+            continue
+        if prefix and not str(key).startswith(prefix):
+            continue
+        start = times.get("start_time")
+        end = times.get("end_time")
+        if start is not None and end is not None:
+            completed.append(max(end - start, 0.0))
+        triggers = times.get("trigger_time_list", [])
+        if len(triggers) > 1:
+            total_triggers += len(triggers) - 1
+
+    # Session completion from learning_path
+    total_in_path = 0
+    sessions_learned = 0
+    if goal_id is not None:
+        for g in goals:
+            if isinstance(g, dict) and g.get("id") == goal_id:
+                path = g.get("learning_path", [])
+                total_in_path = len(path)
+                sessions_learned = sum(1 for s in path if isinstance(s, dict) and s.get("if_learned"))
+                break
+
+    # Mastery history (keys may be int or str depending on serialization)
+    history = []
+    if isinstance(mastery_history, dict) and goal_id is not None:
+        history = mastery_history.get(str(goal_id), mastery_history.get(goal_id, []))
+    if not isinstance(history, list):
+        history = []
+
+    total_duration = sum(completed)
+    avg_duration = total_duration / len(completed) if completed else 0.0
+
+    return {
+        "user_id": user_id,
+        "goal_id": goal_id,
+        "sessions_completed": len(completed),
+        "total_sessions_in_path": total_in_path,
+        "sessions_learned": sessions_learned,
+        "avg_session_duration_sec": round(avg_duration, 1),
+        "total_learning_time_sec": round(total_duration, 1),
+        "motivational_triggers_count": total_triggers,
+        "mastery_history": history,
+        "latest_mastery_rate": history[-1] if history else None,
+    }
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

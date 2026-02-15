@@ -15,6 +15,7 @@
 5. [Flow 2D — Refining a Learning Goal](#flow-2d--refining-a-learning-goal)
 6. [Flow 2E — Determining Skill Gap & Identifying Current Level](#flow-2e--determining-skill-gap--identifying-current-level)
 7. [Flow 3 — User Account Deletion](#flow-3--user-account-deletion)
+8. [Flow 4 — Behavioral Patterns Display (Real Metrics)](#flow-4--behavioral-patterns-display-real-metrics)
 
 ---
 
@@ -298,6 +299,63 @@ python -m pytest backend/tests/test_auth_api.py::TestDeleteAccountEndpoint backe
 
 ---
 
+## Flow 4 — Behavioral Patterns Display (Real Metrics)
+
+### User Story
+
+> **As a** learner viewing my profile,
+> **I want to** see real metrics about my learning behavior (session count, average duration, total time, motivational triggers, mastery progress),
+> **so that** I can understand my actual learning patterns rather than seeing generic AI-generated descriptions.
+
+### Backend Test Scripts
+
+| Test file | Class / Tests | What it covers |
+|---|---|---|
+| `backend/tests/test_behavioral_metrics.py` | `TestBehavioralMetrics` (7 tests) | `GET /behavioral-metrics/{user_id}` endpoint: 404 on missing user, zero metrics on empty state, session duration computation, goal filtering, trigger counting, mastery history, sessions learned count |
+| `backend/tests/test_onboarding_api.py` | `TestCreateLearnerProfileEndpoint` (3 tests) | Verifies profile creation still produces valid `behavioral_patterns` (schema unchanged) |
+
+### Streamlit Frontend Test Steps
+
+#### 4.1 — No sessions completed (fresh profile)
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Complete onboarding and navigate to **My Profile** | Profile page loads with all sections |
+| 2 | Observe the **Behavioral Patterns** section | Section header "Behavioral Patterns" is visible |
+| 3 | Check **Session Completion** | Progress bar at 0%. Caption: "0 of N sessions completed" (where N = number of sessions in the learning path) |
+| 4 | Check **Session Duration & Engagement** | Info message: "No completed sessions yet. Complete a learning session to see engagement metrics." |
+| 5 | Check **Motivational Triggers** | Info message: "No data yet." |
+| 6 | Check **Mastery Progress** | Info message: "No mastery data yet. Study sessions to see your mastery trend." |
+
+#### 4.2 — After completing one or more sessions
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to the learning path, start a session, and click **Complete Session** | Session marked as learned. Redirected to Learning Path page |
+| 2 | Navigate to **My Profile** | Profile page loads |
+| 3 | Check **Session Completion** | Progress bar reflects completion ratio. Caption: "1 of N sessions completed" |
+| 4 | Check **Session Duration & Engagement** | Three metric cards visible: "Sessions Completed" (1), "Avg Duration" (X.X min), "Total Learning Time" (X.X min). Values should be realistic (not zero, not extremely large) |
+| 5 | Check **Motivational Triggers** | Caption: "X motivational trigger(s) received across all sessions" (X depends on session duration; if session was < 3 min, X may be 0) |
+| 6 | Complete a second session (spend at least 4 minutes to trigger motivational prompts) | Navigate back to My Profile. Sessions Completed shows 2. Avg Duration updates. Motivational triggers count increases |
+| 7 | Check **Mastery Progress** | If mastery data has been recorded, shows progress bar with latest mastery rate and sample count. Otherwise shows "No mastery data yet." |
+
+#### 4.3 — Multiple goals
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Add a second learning goal and complete onboarding for it | Second goal is created with its own learning path |
+| 2 | Switch to the second goal and navigate to **My Profile** | Behavioral patterns show metrics only for the second goal (should show "No completed sessions yet" if no sessions done for this goal) |
+| 3 | Switch back to the first goal | Behavioral patterns show the first goal's metrics (previously completed sessions should be reflected) |
+
+#### 4.4 — Backend unavailable (fallback)
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Stop the backend server | Backend is unreachable |
+| 2 | Navigate to **My Profile** | Behavioral patterns section falls back to displaying the LLM-generated text (system usage frequency, session duration engagement, motivational triggers, additional notes) |
+
+---
+
 ## Test Coverage Summary
 
 ### Backend Test Files
@@ -309,7 +367,8 @@ python -m pytest backend/tests/test_auth_api.py::TestDeleteAccountEndpoint backe
 | `backend/tests/test_auth_api.py` | 23 | Flow 1 (register/login/me endpoints), Flow 3 (delete account endpoint + lifecycle) |
 | `backend/tests/test_onboarding_api.py` | 34 | Flow 2B (PDF extract), Flow 2D (goal refinement), Flow 2E (skill gap + profile creation + event logging), config + personas endpoints |
 | `backend/tests/test_fslsm_update.py` | 2 | Flow 2A (FSLSM dimension updates — integration test, requires LLM API key) |
-| **Total** | **111** | |
+| `backend/tests/test_behavioral_metrics.py` | 7 | Flow 4 (behavioral metrics endpoint: computation, filtering, edge cases) |
+| **Total** | **118** | |
 
 ### Running All Tests
 
@@ -318,7 +377,7 @@ python -m pytest backend/tests/test_auth_api.py::TestDeleteAccountEndpoint backe
 python -m pytest backend/tests/test_store_and_auth.py backend/tests/test_user_state.py -v
 
 # API endpoint tests (requires full backend dependencies — langchain, etc.):
-python -m pytest backend/tests/test_auth_api.py backend/tests/test_onboarding_api.py -v
+python -m pytest backend/tests/test_auth_api.py backend/tests/test_onboarding_api.py backend/tests/test_behavioral_metrics.py -v
 
 # All tests:
 python -m pytest backend/tests/ -v

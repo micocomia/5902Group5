@@ -487,6 +487,20 @@ def iterative_refine_learning_path(learner_profile, learning_path, max_iteration
     return None
 
 
+def get_behavioral_metrics(user_id, goal_id=None):
+    """Fetch computed behavioral metrics from the backend."""
+    url = f"{backend_endpoint}behavioral-metrics/{user_id}"
+    if goal_id is not None:
+        url += f"?goal_id={goal_id}"
+    try:
+        resp = httpx.get(url, timeout=30)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        pass
+    return None
+
+
 def get_user_state(backend_ep, user_id):
     """GET /user-state/{user_id} → (status_code, response_json)"""
     if use_mock_data:

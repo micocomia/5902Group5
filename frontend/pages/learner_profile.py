@@ -1,6 +1,6 @@
 import math
 import streamlit as st
-from utils.request_api import create_learner_profile, update_learner_profile, auth_delete_user, get_app_config
+from utils.request_api import create_learner_profile, update_learner_profile, auth_delete_user, get_app_config, get_behavioral_metrics
 from components.skill_info import render_skill_info
 from components.navigation import render_navigation
 from utils.pdf import extract_text_from_pdf
@@ -155,16 +155,72 @@ def render_learning_preferences(goal):
     st.info(prefs.get('additional_notes', 'None'))
 
 def render_behavioral_patterns(goal):
-    learner_profile = goal["learner_profile"]
-    st.markdown("#### 📊 Behavioral Patterns")
-    st.write(f"**System Usage Frequency:**")
-    st.info(learner_profile['behavioral_patterns']['system_usage_frequency'])
-    st.write(f"**Session Duration and Engagement:**")
-    st.info(learner_profile['behavioral_patterns']['session_duration_engagement'])
-    st.write(f"**Motivational Triggers:**")
-    st.info(learner_profile['behavioral_patterns']['motivational_triggers'])
-    st.write(f"**Additional Notes:**")
-    st.info(learner_profile['behavioral_patterns']['additional_notes'])
+    st.markdown("#### Behavioral Patterns")
+
+    # Fetch real metrics from backend
+    user_id = st.session_state.get("userId")
+    goal_id = None
+    if isinstance(goal, dict) and "id" in goal:
+        goal_id = goal["id"]
+    metrics = get_behavioral_metrics(user_id, goal_id) if user_id else None
+
+    if metrics is None:
+        # Fallback to LLM-generated text if endpoint unavailable
+        learner_profile = goal["learner_profile"]
+        bp = learner_profile.get("behavioral_patterns", {})
+        st.write("**System Usage Frequency:**")
+        st.info(bp.get("system_usage_frequency", "N/A"))
+        st.write("**Session Duration and Engagement:**")
+        st.info(bp.get("session_duration_engagement", "N/A"))
+        st.write("**Motivational Triggers:**")
+        st.info(bp.get("motivational_triggers", "N/A"))
+        st.write("**Additional Notes:**")
+        st.info(bp.get("additional_notes", "N/A"))
+        return
+
+    # --- Session Completion ---
+    st.write("**Session Completion:**")
+    total_in_path = metrics.get("total_sessions_in_path", 0)
+    sessions_learned = metrics.get("sessions_learned", 0)
+    if total_in_path > 0:
+        st.progress(sessions_learned / total_in_path)
+        st.caption(f"{sessions_learned} of {total_in_path} sessions completed")
+    else:
+        st.info("No learning path generated yet.")
+
+    # --- Session Duration & Engagement ---
+    st.write("**Session Duration & Engagement:**")
+    sessions_completed = metrics.get("sessions_completed", 0)
+    if sessions_completed > 0:
+        avg_min = metrics.get("avg_session_duration_sec", 0) / 60.0
+        total_min = metrics.get("total_learning_time_sec", 0) / 60.0
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Sessions Completed", sessions_completed)
+        with col2:
+            st.metric("Avg Duration", f"{avg_min:.1f} min")
+        with col3:
+            st.metric("Total Learning Time", f"{total_min:.1f} min")
+    else:
+        st.info("No completed sessions yet. Complete a learning session to see engagement metrics.")
+
+    # --- Motivational Triggers ---
+    st.write("**Motivational Triggers:**")
+    trigger_count = metrics.get("motivational_triggers_count", 0)
+    if sessions_completed > 0:
+        st.caption(f"{trigger_count} motivational trigger(s) received across all sessions")
+    else:
+        st.info("No data yet.")
+
+    # --- Mastery Progress ---
+    st.write("**Mastery Progress:**")
+    latest_mastery = metrics.get("latest_mastery_rate")
+    mastery_history = metrics.get("mastery_history", [])
+    if latest_mastery is not None:
+        st.progress(min(float(latest_mastery), 1.0))
+        st.caption(f"Latest mastery rate: {latest_mastery:.1%} (sampled {len(mastery_history)} time(s))")
+    else:
+        st.info("No mastery data yet. Study sessions to see your mastery trend.")
 
 
 def render_additional_info_form(goal):

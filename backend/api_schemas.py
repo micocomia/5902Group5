@@ -198,3 +198,16 @@ class AuthLoginRequest(BaseModel):
 
 class UserStateRequest(BaseModel):
     state: Dict[str, Any]
+
+
+class BehavioralMetricsResponse(BaseModel):
+    user_id: str
+    goal_id: Optional[int] = None
+    sessions_completed: int
+    total_sessions_in_path: int
+    sessions_learned: int
+    avg_session_duration_sec: float
+    total_learning_time_sec: float
+    motivational_triggers_count: int
+    mastery_history: list
+    latest_mastery_rate: Optional[float] = None
