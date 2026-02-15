@@ -50,20 +50,29 @@ class SearchEnhancedKnowledgeDrafter(BaseAgent):
             payload = KnowledgeDraftPayload.model_validate(payload)
         data = payload.model_dump()
         # Optionally enrich external resources using the search RAG manager
+        sources_used = []
         if self.use_search and self.search_rag_manager is not None:
             session = data.get("learning_session") or {}
             session_title = str(session.get("title", "")).strip() or "learning_session"
             knowledge_point = data.get("knowledge_point") or {}
             knowledge_point_name = str(knowledge_point.get('name', '')).strip()
             query = f"{session_title} {knowledge_point_name}".strip()
-            docs = self.search_rag_manager.invoke(query)
+            docs = self.search_rag_manager.invoke_hybrid(query)
+            # Collect unique source_type values
+            for doc in docs:
+                st = doc.metadata.get("source_type")
+                if st and st not in sources_used:
+                    sources_used.append(st)
             context = format_docs(docs)
             if context:
                 ext = data.get("external_resources") or ""
                 data["external_resources"] = f"{ext}{context}"
         raw_output = self.invoke(data, task_prompt=search_enhanced_knowledge_drafter_task_prompt)
         validated_output = KnowledgeDraft.model_validate(raw_output)
-        return validated_output.model_dump()
+        result = validated_output.model_dump()
+        if sources_used:
+            result["sources_used"] = sources_used
+        return result
 
 def draft_knowledge_point_with_llm(
     llm,

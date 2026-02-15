@@ -46,6 +46,10 @@ from datetime import datetime
 def _load_stores():
     store.load()
     auth_store.load()
+    if search_rag_manager.verified_content_manager:
+        search_rag_manager.verified_content_manager.index_verified_content(
+            app_config.get("verified_content", {}).get("base_dir", "resources/verified-course-content")
+        )
 
 class BehaviorEvent(BaseModel):
     user_id: str

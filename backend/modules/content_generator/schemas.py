@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -23,6 +23,7 @@ class KnowledgePoints(BaseModel):
 class KnowledgeDraft(BaseModel):
     title: str
     content: str
+    sources_used: Optional[List[str]] = None
 
 
 class DocumentStructure(BaseModel):

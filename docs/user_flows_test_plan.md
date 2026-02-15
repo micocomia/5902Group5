@@ -16,6 +16,7 @@
 6. [Flow 2E — Determining Skill Gap & Identifying Current Level](#flow-2e--determining-skill-gap--identifying-current-level)
 7. [Flow 3 — User Account Deletion](#flow-3--user-account-deletion)
 8. [Flow 4 — Behavioral Patterns Display (Real Metrics)](#flow-4--behavioral-patterns-display-real-metrics)
+9. [Flow 5 — Knowledge Content with Verified Course Materials](#flow-5--knowledge-content-with-verified-course-materials)
 
 ---
 
@@ -356,6 +357,43 @@ python -m pytest backend/tests/test_auth_api.py::TestDeleteAccountEndpoint backe
 
 ---
 
+## Flow 5 — Knowledge Content with Verified Course Materials
+
+### User Story
+
+> **As a** learner studying a topic covered by verified course materials,
+> **I want** the learning content to be sourced from curated university materials first,
+> **so that** I receive accurate, high-quality educational content rather than unreliable web search results.
+
+### Backend Test Scripts
+
+| Test file | Class / Tests | What it covers |
+|---|---|---|
+| `backend/tests/test_verified_content.py` | `TestVerifiedContentLoader` (6 tests) | Course scanning, file loading (JSON, text, unsupported), metadata assignment |
+| `backend/tests/test_verified_content.py` | `TestVerifiedContentManager` (5 tests) | Indexing, retrieval, dedup (skip if already indexed), empty collection, course listing |
+| `backend/tests/test_verified_content.py` | `TestHybridRetrieval` (4 tests) | Verified-first cascade, web fallback, no verified manager fallback, source type preservation |
+
+**Run command:**
+```bash
+python -m pytest backend/tests/test_verified_content.py -v
+```
+
+### Streamlit Frontend Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Set a learning goal matching a verified course (e.g., "Introduction to Computer Science and Programming in Python") | Goal is accepted |
+| 2 | Complete onboarding, schedule a learning path | Learning path is created with sessions |
+| 3 | Start a session and wait for content generation | Spinners show stages 1-4. Content is generated |
+| 4 | Observe the **source attribution banner** above the document | Info banner: "Content sourced from verified university course materials (MIT OpenCourseWare)" |
+| 5 | Observe the generated learning document | Content incorporates MIT 6.0001 material. Check that content is substantive and accurate |
+| 6 | Set a learning goal NOT in verified content (e.g., "Learn Kubernetes cluster management") | Goal is accepted |
+| 7 | Generate content for a session | Content generated using web search (fallback) |
+| 8 | Observe the **source attribution banner** | Info banner: "Content supplemented with web search results" |
+| 9 | Check backend logs for source attribution | `source_type=verified_content` for step 4, `source_type=web_search` for step 7 |
+
+---
+
 ## Test Coverage Summary
 
 ### Backend Test Files
@@ -368,7 +406,8 @@ python -m pytest backend/tests/test_auth_api.py::TestDeleteAccountEndpoint backe
 | `backend/tests/test_onboarding_api.py` | 34 | Flow 2B (PDF extract), Flow 2D (goal refinement), Flow 2E (skill gap + profile creation + event logging), config + personas endpoints |
 | `backend/tests/test_fslsm_update.py` | 2 | Flow 2A (FSLSM dimension updates — integration test, requires LLM API key) |
 | `backend/tests/test_behavioral_metrics.py` | 7 | Flow 4 (behavioral metrics endpoint: computation, filtering, edge cases) |
-| **Total** | **118** | |
+| `backend/tests/test_verified_content.py` | 15 | Flow 5 (verified content loading, indexing, hybrid retrieval, fallback) |
+| **Total** | **133** | |
 
 ### Running All Tests
 

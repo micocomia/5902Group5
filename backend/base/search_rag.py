@@ -12,6 +12,7 @@ from base.dataclass import SearchResult
 from base.embedder_factory import EmbedderFactory
 from base.searcher_factory import SearcherFactory, SearchRunner
 from base.rag_factory import TextSplitterFactory, VectorStoreFactory
+from base.verified_content_manager import VerifiedContentManager
 from utils.config import ensure_config_dict
 
 logger = logging.getLogger(__name__)
@@ -20,18 +21,20 @@ logger = logging.getLogger(__name__)
 class SearchRagManager:
 
     def __init__(
-        self, 
+        self,
         embedder: Embeddings,
         text_splitter: Optional[TextSplitter] = None,
         vectorstore: Optional[VectorStore] = None,
         search_runner: Optional[SearchRunner] = None,
         max_retrieval_results: int = 5,
+        verified_content_manager: Optional[VerifiedContentManager] = None,
     ):
         self.embedder = embedder
         self.text_splitter = text_splitter
         self.vectorstore = vectorstore
         self.search_runner = search_runner
         self.max_retrieval_results = max_retrieval_results
+        self.verified_content_manager = verified_content_manager
 
     @staticmethod
     def from_config(
@@ -60,12 +63,22 @@ class SearchRagManager:
             config=config
         )
 
+        verified_content_manager = None
+        verified_cfg = config.get("verified_content", {})
+        if verified_cfg.get("enabled", False):
+            try:
+                verified_content_manager = VerifiedContentManager.from_config(config)
+                logger.info("VerifiedContentManager initialized successfully.")
+            except Exception as e:
+                logger.warning(f"Failed to initialize VerifiedContentManager: {e}")
+
         return SearchRagManager(
             embedder=embedder,
             text_splitter=text_splitter,
             vectorstore=vectorstore,
             search_runner=search_runner,
             max_retrieval_results=config.get("rag", {}).get("num_retrieval_results", 5),
+            verified_content_manager=verified_content_manager,
         )
 
 
@@ -110,6 +123,41 @@ class SearchRagManager:
         self.add_documents(documents=documents)
         retrieved_docs = self.retrieve(query)
         return retrieved_docs
+
+    def invoke_hybrid(self, query: str, k: Optional[int] = None) -> List[Document]:
+        """Verified-first hybrid retrieval. Uses verified content as primary source,
+        falls back to web search when insufficient results."""
+        k = k or self.max_retrieval_results
+
+        # Try verified content first
+        verified_docs = []
+        if self.verified_content_manager is not None:
+            verified_docs = self.verified_content_manager.retrieve(query, k=k)
+            logger.info(f"Verified content returned {len(verified_docs)} results for query: {query[:80]}")
+
+        # If verified content provides enough results, return them
+        if len(verified_docs) >= k:
+            return verified_docs[:k]
+
+        # Fall back to web search for remaining slots
+        remaining = k - len(verified_docs)
+        try:
+            web_docs = self.invoke(query)
+            # Tag web docs with source_type if not already tagged
+            for doc in web_docs:
+                if "source_type" not in doc.metadata:
+                    doc.metadata["source_type"] = "web_search"
+        except Exception as e:
+            logger.warning(f"Web search failed, using verified results only: {e}")
+            web_docs = []
+
+        # Combine: verified first, then web
+        combined = verified_docs + web_docs[:remaining]
+        logger.info(
+            f"Hybrid retrieval: {len(verified_docs)} verified + "
+            f"{min(len(web_docs), remaining)} web = {len(combined)} total"
+        )
+        return combined
 
 
 def format_docs(docs: List[Document]) -> str:

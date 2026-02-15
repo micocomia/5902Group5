@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 import urllib.parse as urlparse
 from components.time_tracking import track_session_learning_start_time
 from utils.request_api import draft_knowledge_points, explore_knowledge_points, generate_document_quizzes, integrate_learning_document, update_learner_profile, get_app_config
-from utils.format import prepare_markdown_document
+from utils.format import prepare_markdown_document, extract_sources_used
 from utils.state import get_current_session_uid, save_persistent_state
 from config import use_mock_data, use_search
 from assets.js.doc_reading import doc_reading_auto_scroll_js
@@ -43,7 +43,19 @@ def render_learning_content():
     else:
         track_session_learning_start_time()
         learning_content = st.session_state["document_caches"].get(session_uid, "")
-        
+
+        # Source attribution banner
+        sources_used = learning_content.get("sources_used", []) if isinstance(learning_content, dict) else []
+        if sources_used:
+            has_verified = "verified_content" in sources_used
+            has_web = "web_search" in sources_used
+            if has_verified and has_web:
+                st.info("Content sourced from verified course materials, supplemented with web search")
+            elif has_verified:
+                st.info("Content sourced from verified university course materials (MIT OpenCourseWare)")
+            elif has_web:
+                st.info("Content supplemented with web search results")
+
         render_type = "by_section"
         document = learning_content["document"]
         if render_type == "by_section":
@@ -214,6 +226,7 @@ def render_content_preparation(goal):
     if knowledge_drafts is None:
         st.error("Failed to draft knowledge points.")
         return
+    sources_used = extract_sources_used(knowledge_drafts)
     st.success("Stage 2/4 📝 Knowledge points drafted successfully.")
     with st.spinner("Stage 3/4 - Integrating knowledge document..."):
         document_structure = integrate_learning_document(
@@ -230,7 +243,7 @@ def render_content_preparation(goal):
         st.error("Failed to integrate knowledge document.")
         return
     st.success("Stage 3/4 📚 Knowledge document integrated successfully.")
-    learning_content = {"document": learning_document}
+    learning_content = {"document": learning_document, "sources_used": sources_used}
     with st.spinner("Stage 4/4 - Generating document quizzes..."):
         quizzes = generate_document_quizzes(
             goal["learner_profile"],

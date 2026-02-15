@@ -1,6 +1,19 @@
 import ast
 
 
+def extract_sources_used(knowledge_drafts):
+    """Collect unique source_type values across all knowledge drafts."""
+    if isinstance(knowledge_drafts, str):
+        knowledge_drafts = ast.literal_eval(knowledge_drafts)
+    sources = []
+    for draft in knowledge_drafts:
+        if isinstance(draft, dict):
+            for s in draft.get("sources_used", []):
+                if s not in sources:
+                    sources.append(s)
+    return sources
+
+
 def convert_knowledge_perspectives_to_markdown(data):
     markdown_text = ""
     for category, items in data.items():

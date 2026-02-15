@@ -141,7 +141,7 @@ You should see the **FastAPI automatic documentation page** listing all availabl
   docker compose -f docker/docker-compose.yml down
   ```
 
-Both options cleanly shut down the server. Your data (stored in the `data/` folder) is preserved between restarts.
+Both options cleanly shut down the server. Your data (stored in the `data/users/` folder) is preserved between restarts.
 
 #### Restarting After Stopping
 
@@ -385,7 +385,7 @@ search:
 **Vector Store:**
 ```yaml
 vectorstore:
-  persist_directory: data/vectorstore
+  persist_directory: data/vectorstore   # runtime vectorstore
   collection_name: genmentor
 ```
 

@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "users"
 _PROFILES_PATH = _DATA_DIR / "profiles.json"
 _EVENTS_PATH = _DATA_DIR / "events.json"
 _USER_STATES_PATH = _DATA_DIR / "user_states.json"
